@@ -1,6 +1,6 @@
 use winnow::{
     ascii::multispace0,
-    combinator::{alt, preceded, repeat, rest, separated_pair},
+    combinator::{preceded, rest, separated_pair},
     error::InputError,
     token::{literal, one_of, take, take_while},
     PResult, Parser,
@@ -60,7 +60,7 @@ fn g1_comment_parse<'a>(input: &mut &'a str) -> PResult<&'a str> {
     // should only be applied as final parse option
     preceded(';', rest).parse_next(input)
 }
-fn g1_parameter_parse<'a>(input: &mut &'a str) -> PResult<HashMap<char, f32>> {
+fn g1_parameter_parse<'a>(input: &mut &'a str) -> PResult<HashMap<char, String>> {
     let mut out = HashMap::new();
     while let Ok((c, val)) = separated_pair(
         one_of::<_, _, InputError<_>>(['X', 'Y', 'Z', 'E', 'F']),
@@ -161,33 +161,33 @@ pub enum Label {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum GCodeLine {
     Unprocessed(Id, String),
-    Processed(Id),
+    Processed(Id, G1),
 }
 
 impl GCodeLine {
     fn id(&self) -> Id {
         match self {
             GCodeLine::Unprocessed(id, _) => *id,
-            GCodeLine::Processed(id) => *id,
+            GCodeLine::Processed(id, _) => *id,
         }
     }
 }
 
 // intermediary struct for parsing line into vertex
 // exists because all of the params are optional
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct G1 {
-    pub x: Option<f32>,
-    pub y: Option<f32>,
-    pub z: Option<f32>,
-    pub e: Option<f32>,
-    pub f: Option<f32>,
+    pub x: Option<String>,
+    pub y: Option<String>,
+    pub z: Option<String>,
+    pub e: Option<String>,
+    pub f: Option<String>,
     pub comments: Option<String>,
     span: String,
 }
 
 impl G1 {
-    fn build(params: Vec<(&str, f32)>) -> G1 {
+    fn build(params: Vec<(&str, String)>) -> G1 {
         let mut out = G1::default();
         for param in params {
             match param {
@@ -227,12 +227,20 @@ impl Pos {
         if pre_home(*prev) {
             panic!("g1 move from unhomed state")
         }
+        let G1 {x, y, z, e, f, comments, span: _} = g1;
+        let x = x.unwrap_or_else(|| String::from(prev.x));
+        let 
+        let x: f32 = x.unwrap_or(prev.x.).parse()?;
+        let y: f32 = y.parse()?;
+        let z: f32 = z.parse()?;
+        let e: f32 = e.parse()?;
+        let f: f32 = f.parse()?;
         Pos {
-            x: g1.x.unwrap_or(prev.x),
-            y: g1.y.unwrap_or(prev.y),
-            z: g1.z.unwrap_or(prev.z),
-            e: g1.e.unwrap_or(0.0),
-            f: g1.f.unwrap_or(prev.f),
+            x: g1.x.unwrap_or(prev.x).parse().unwrap(),
+            y: g1.y.unwrap_or(prev.y).parse().unwrap(),
+            z: g1.z.unwrap_or(prev.z).parse(),
+            e: g1.e.unwrap_or(0.0).parse(),
+            f: g1.f.unwrap_or(prev.f).parse(),
         }
     }
     pub fn dist(&self, p: &Pos) -> f32 {
@@ -435,7 +443,7 @@ impl Parsed {
         Ok(parsed)
     }
     pub fn from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let gcode = parse_file(path)?;
+        let gcode = file::read(path)?;
         let mut parsed = Self {
             lines: Vec::new(),
             vertices: HashMap::new(),
@@ -488,7 +496,7 @@ impl Parsed {
         }
         self.shapes = out;
     }
-    pub fn get_centroid(&self, vertices: &HashSet<Id>) -> crate::Vec3 {
+    pub fn get_centroid(&self, vertices: &HashSet<Id>) -> Vec3 {
         let (mut x, mut y, mut z, mut count) = (0.0, 0.0, 0.0, 0.0);
         for vertex in vertices {
             count += 1.0;
@@ -497,7 +505,7 @@ impl Parsed {
             y += v.to.y;
             z += v.to.z;
         }
-        let mut out = crate::Vec3 { x, y, z };
+        let mut out = Vec3 { x, y, z };
         out /= count;
         out
     }
@@ -661,7 +669,7 @@ impl Parsed {
         out
     }
     pub fn write_to_file(&self, path: &str) -> Result<(), std::io::Error> {
-        use crate::parser::emit::Emit;
+        use emit::Emit;
         use std::fs::File;
         let out = self.emit(self, false);
         let mut f = File::create(path)?;
