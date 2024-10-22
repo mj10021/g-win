@@ -30,8 +30,18 @@ enum SupportedCommands {
     M82,
     M83
 }
-impl SupportedCommands {
-    fn get_parser(&self) -> fn(&str) -> PResult<GCodeLine> {
+impl<'a> SupportedCommands {
+    fn get_key(&self) -> &str {
+        match self {
+            SupportedCommands::G1 => "G1",
+            SupportedCommands::G28 => "G28",
+            SupportedCommands::G90 => "G90",
+            SupportedCommands::G91 => "G91",
+            SupportedCommands::M82 => "M82",
+            SupportedCommands::M83 => "M83"
+        }
+    }
+    fn get_parser(&self) -> fn(&'a mut &'a str) -> PResult<GCodeLine> {
         match self {
             SupportedCommands::G1 => g1_parse,
             _ => unimplemented!()
@@ -56,6 +66,10 @@ fn outer_parser(input: &str) -> PResult<GCodeModel> {
 
         }
     }
+}
+
+fn parse_next_word(input: &str) -> PResult<&str> {
+
 }
 
 // Helper function to check if a character is part of a number
