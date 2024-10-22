@@ -1,13 +1,14 @@
-pub fn read(path: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let file = String::from_utf8(std::fs::read(path)?)?;
-    Ok(file
-        .lines()
-        .filter_map(|s| {
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.to_string())
+// check that path is to a file with the correct extension and read to String
+pub fn read(path: &str) -> Result<String, Box<dyn std::error::Error>> {
+
+    // check path extension
+    if let Some(extension) = std::path::Path::new(path)
+        .extension()
+        .and_then(|ext| ext.to_str()) {
+            match extension {
+                ".gcode" => return Ok(String::from_utf8(std::fs::read(path)?)?),
+                _ => return Err(Box::from("unsupported extension"))
             }
-        })
-        .collect())
+        }
+    Err(Box::from("unable to parse file extension"))
 }

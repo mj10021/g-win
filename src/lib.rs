@@ -8,135 +8,19 @@ use winnow::{
 
 pub mod emit;
 pub mod file;
-use std::collections::{HashMap, HashSet};
+pub mod parsers;
+use std::{collections::{HashMap, HashSet}, str::FromStr};
 use std::io::Write;
 
-// Helper function to check if a character is part of a number
-fn is_number_char(c: char) -> bool {
-    c.is_numeric() || c == '.' || c == '-' || c == '+'
-}
 
-#[test]
-fn number_chars() {
-    let tests = ["1.0000231", "-1.02030", "1.2+-0.0001", "-0.0000011"];
-    for test in tests {
-        for c in test.chars() {
-            if !is_number_char(c) {
-                panic!("invalid charachter found: {}", c);
-            }
-        }
-    }
-}
-
-fn clear_whitespace<'a>(input: &mut &'a str) -> PResult<String> {
-    // String to accumulate the output
-    let mut out = String::new();
-
-    // Loop until all input is processed
-    loop {
-        // Consume whitespace and discard it
-        loop {
-            if multispace0::<&str, winnow::error::ErrorKind>(input).is_err() {
-                break;
-            }
-        }
-        // Capture a single non-whitespace character and append it to the output string
-        if let Ok(c) = take::<usize, &str, winnow::error::ErrorKind>(1_usize).parse_next(input) {
-            out.push_str(c);
-        }
-    }
-
-    Ok(out)
-}
-#[test]
-fn whitespace_test() {
-    let mut test = "       g  a  SS   a S d   d ";
-    let res = clear_whitespace(&mut test).unwrap();
-    assert_eq!(res.as_str(), "gaSSaSdd");
-}
-
-fn g1_comment_parse<'a>(input: &mut &'a str) -> PResult<&'a str> {
-    // return any characters following ';',
-    // should only be applied as final parse option
-    preceded(';', rest).parse_next(input)
-}
-fn g1_parameter_parse<'a>(input: &mut &'a str) -> PResult<HashMap<char, String>> {
-    let mut out = HashMap::new();
-    while let Ok((c, val)) = separated_pair(
-        one_of::<_, _, InputError<_>>(['X', 'Y', 'Z', 'E', 'F']),
-        winnow::combinator::empty,
-        take_while(1.., |c| is_number_char(c)).parse_to(),
-    )
-    .parse_next(input)
-    {
-        out.insert(c, val);
-    }
-    Ok(out)
-}
-
-fn g1_parse_test() {}
-
-// Function that takes a processed G1 command and returns parameters
-fn g1_parse<'a>(input: &'a mut &'a str) -> PResult<G1> {
-    let ((span, _, params, _, comments),) = ((
-        clear_whitespace,
-        literal("G1"),
-        g1_parameter_parse,
-        literal(';'),
-        rest,
-    ),)
-        .parse_next(input)?;
-    let comments = {
-        if comments.is_empty() {
-            None
-        } else {
-            Some(String::from(comments))
-        }
-    };
-    let (x, y, z, e, f) = (
-        params.get(&'X').copied(),
-        params.get(&'Y').copied(),
-        params.get(&'Z').copied(),
-        params.get(&'E').copied(),
-        params.get(&'F').copied(),
-    );
-    Ok(G1 {
-        x,
-        y,
-        z,
-        e,
-        f,
-        comments,
-        span: String::new(),
-    })
-}
-
-fn line_parse<'a>(input: &'a mut &'a str, parsed: &mut Parsed) -> GCodeLine {
-    let id = parsed.id_counter.get();
-    let g1 = g1_parse(input);
-    if let Ok(g1) = g1 {
-        GCodeLine::Unprocessed(Id(0), String::new())
-    } else {
-        GCodeLine::Unprocessed(Id(0), String::new())
-    }
-}
-
-pub fn parse_file(path: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let out = String::from_utf8(std::fs::read(path)?)?
-        .lines()
-        .filter_map(|s| {
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.to_string())
-            }
-        })
-        .collect();
-    Ok(out)
-}
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Id(u32);
+impl Default for Id {
+    fn default() -> Self {
+        Id(0)
+    }
+}
 impl Id {
     fn get(&mut self) -> Self {
         let out = self.0;
@@ -157,18 +41,33 @@ pub enum Label {
     LiftZ,
     LowerZ,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+struct TextLocation {
+    line: u32,
+    col: u32,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+struct Span {
+    start: TextLocation,
+    end: TextLocation
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum GCodeLine {
-    Unprocessed(Id, String),
-    Processed(Id, G1),
+    Unprocessed(Span, Id, String),
+    Processed(Span, Id, G1),
 }
 
 impl GCodeLine {
     fn id(&self) -> Id {
         match self {
-            GCodeLine::Unprocessed(id, _) => *id,
-            GCodeLine::Processed(id, _) => *id,
+            GCodeLine::Unprocessed(_, id, _) => *id,
+            GCodeLine::Processed(_, id, _) => *id,
+        }
+    } fn span(&self) -> Span {
+        match self {
+            GCodeLine::Unprocessed(span, _, _) => *span,
+            GCodeLine::Processed(span, _, _) => *span,
         }
     }
 }
@@ -183,7 +82,6 @@ pub struct G1 {
     pub e: Option<String>,
     pub f: Option<String>,
     pub comments: Option<String>,
-    span: String,
 }
 
 impl G1 {
@@ -201,6 +99,25 @@ impl G1 {
         }
         out
     }
+    fn params(&self) -> Vec<(&str, String)> {
+        let mut out = Vec::new();
+        if let Some(x) = &self.x {
+            out.push(("X", x.clone()));
+        };
+        if let Some(y) = &self.y {
+            out.push(("Y", y.clone()));
+        };
+        if let Some(z) = &self.z {
+            out.push(("Z", z.clone()));
+        };
+        if let Some(e) = &self.e {
+            out.push(("E", e.clone()));
+        };
+        if let Some(f) = &self.f {
+            out.push(("F", f.clone()));
+        };
+        out
+    }
 }
 // state tracking struct for vertices
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -214,6 +131,27 @@ pub struct Pos {
 }
 
 impl Pos {
+    fn from_g1(g1: &G1, prev: Option<Pos>) -> Self {
+        let prev = {
+            if let Some(prev) = prev {
+                prev
+            } else {
+                Pos::home()
+            }
+        };
+        let mut out = prev.clone();
+        for param in g1.params() {
+            match param {
+                ("X", val) => out.x = val.parse().unwrap(),
+                ("Y", val) => out.y = val.parse().unwrap(),
+                ("Z", val) => out.z = val.parse().unwrap(),
+                ("E", val) => out.e = val.parse().unwrap(),
+                ("F", val) => out.f = val.parse().unwrap(),
+                _ => (),
+            }
+        }
+        out
+    }
     pub fn home() -> Pos {
         Pos {
             x: 0.0,
@@ -221,26 +159,6 @@ impl Pos {
             z: 0.0,
             e: 0.0,
             f: f32::NEG_INFINITY, // this will not emit if a feedrate is never set
-        }
-    }
-    pub fn build(prev: &Pos, g1: &G1) -> Pos {
-        if pre_home(*prev) {
-            panic!("g1 move from unhomed state")
-        }
-        let G1 {x, y, z, e, f, comments, span: _} = g1;
-        let x = x.unwrap_or_else(|| String::from(prev.x));
-        let 
-        let x: f32 = x.unwrap_or(prev.x.).parse()?;
-        let y: f32 = y.parse()?;
-        let z: f32 = z.parse()?;
-        let e: f32 = e.parse()?;
-        let f: f32 = f.parse()?;
-        Pos {
-            x: g1.x.unwrap_or(prev.x).parse().unwrap(),
-            y: g1.y.unwrap_or(prev.y).parse().unwrap(),
-            z: g1.z.unwrap_or(prev.z).parse(),
-            e: g1.e.unwrap_or(0.0).parse(),
-            f: g1.f.unwrap_or(prev.f).parse(),
         }
     }
     pub fn dist(&self, p: &Pos) -> f32 {
@@ -277,13 +195,13 @@ impl std::fmt::Debug for Vertex {
 }
 
 impl Vertex {
-    fn build(parsed: &mut Parsed, prev: Option<Id>, g1: G1) -> Vertex {
+    fn build(parsed: &mut GCodeModel, prev: Option<Id>, g1: G1) -> Vertex {
         let id = parsed.id_counter.get();
         if prev.is_none() {
             let mut vrtx = Self {
                 id,
                 label: Label::Uninitialized,
-                to: Pos::build(&Pos::home(), &g1),
+                to: Pos::from_g1(&g1, None),
                 prev,
                 next: None,
             };
@@ -294,7 +212,7 @@ impl Vertex {
         let mut vrtx = Vertex {
             id,
             label: Label::Uninitialized,
-            to: Pos::build(&p.to, &g1),
+            to: Pos::from_g1(&g1, Some(p.to)),
             prev,
             next: p.next,
         };
@@ -302,14 +220,14 @@ impl Vertex {
         vrtx.label(parsed);
         vrtx
     }
-    pub fn get_from(&self, parsed: &Parsed) -> Pos {
+    pub fn get_from(&self, parsed: &GCodeModel) -> Pos {
         if let Some(prev) = self.prev {
             parsed.vertices.get(&prev).unwrap().to
         } else {
             Pos::home()
         }
     }
-    fn label(&mut self, parsed: &Parsed) {
+    fn label(&mut self, parsed: &GCodeModel) {
         let from = self.get_from(parsed);
         let dx = self.to.x - from.x;
         let dy = self.to.y - from.y;
@@ -361,7 +279,7 @@ pub struct Shape {
 }
 
 impl Shape {
-    pub fn build(gcode: &mut Parsed) -> Self {
+    pub fn build(gcode: &mut GCodeModel) -> Self {
         let id = gcode.id_counter.get();
         Shape {
             id,
@@ -369,7 +287,7 @@ impl Shape {
             layer: -1.0,
         }
     }
-    fn get_layer(&mut self, gcode: &Parsed) {
+    fn get_layer(&mut self, gcode: &GCodeModel) {
         let mut layer = HashMap::new();
         for line in &self.lines {
             let v = gcode.vertices.get(line).unwrap();
@@ -384,7 +302,7 @@ impl Shape {
             self.layer = layer.iter().next().unwrap().0.parse().unwrap();
         }
     }
-    pub fn _len(&self, gcode: &mut Parsed) -> f32 {
+    pub fn _len(&self, gcode: &mut GCodeModel) -> f32 {
         let mut out = 0.0;
         for line in &self.lines {
             if gcode.vertices.contains_key(line) {
@@ -395,8 +313,8 @@ impl Shape {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Parsed {
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct GCodeModel {
     pub lines: Vec<GCodeLine>, // keep track of line order
     pub vertices: HashMap<Id, Vertex>,
     pub shapes: Vec<Shape>,
@@ -404,8 +322,9 @@ pub struct Parsed {
     pub rel_e: bool,
     id_counter: Id,
 }
-impl Parsed {
-    pub fn from_str(s: &str) -> Result<Self, Box<dyn std::error::Error>> {
+impl FromStr for GCodeModel {
+    type Err = Box<dyn std::error::Error>;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         let gcode: Vec<String> = String::from_utf8(std::fs::read(s)?)?
             .lines()
             .filter_map(|s| {
@@ -442,6 +361,10 @@ impl Parsed {
         parsed.assign_shapes();
         Ok(parsed)
     }
+    
+}
+impl GCodeModel {
+    
     pub fn from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let gcode = file::read(path)?;
         let mut parsed = Self {
