@@ -1,9 +1,5 @@
 use winnow::{
-    ascii::multispace0,
-    combinator::{preceded, rest, separated_pair},
-    error::InputError,
-    token::{literal, one_of, take, take_while},
-    PResult, Parser,
+    ascii::{multispace0, till_line_ending}, combinator::{preceded, rest, separated_pair}, error::InputError, stream::Range, token::{literal, one_of, take, take_till, take_while}, PResult, Parser
 };
 use std::collections::HashMap;
 use crate::{GCodeModel, GCodeLine};
@@ -68,8 +64,16 @@ fn outer_parser(input: &str) -> PResult<GCodeModel> {
     }
 }
 
-fn parse_next_word(input: &str) -> PResult<&str> {
+fn parse_line_with_span(mut input: winnow::Located<&str>) -> PResult<(&str, std::ops::Range<usize>)> {
+    let mut parser = till_line_ending.with_span();
+    let (line, span) = parser.parse_next(&mut input)?;
+    Ok((line, span))
+}
 
+fn parse_word(mut input: &str) -> PResult<(&str, &str)> {
+    let first_char = take_till(0..1, |c: char| c.is_numeric()).parse_next(&mut input)?;
+    let rest = take_while(0.., |c: char| c.is_numeric()).parse_next(&mut input)?;
+    Ok((first_char, rest))
 }
 
 // Helper function to check if a character is part of a number
