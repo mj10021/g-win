@@ -43,8 +43,8 @@ pub enum Label {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-enum SupportedCommand {
-    G1,
+enum Command {
+    G1(G1),
     G28,
     G90,
     G91,
@@ -52,25 +52,10 @@ enum SupportedCommand {
     M83
 }
 
-impl<'a> SupportedCommand {
-    fn get_key(&self) -> &str {
-        match self {
-            SupportedCommand::G1 => "G1",
-            SupportedCommand::G28 => "G28",
-            SupportedCommand::G90 => "G90",
-            SupportedCommand::G91 => "G91",
-            SupportedCommand::M82 => "M82",
-            SupportedCommand::M83 => "M83"
-        }
-    }
-}
-
-
-
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum GCodeLine {
     Unprocessed(Range<usize>, Id, String),
-    Processed(Range<usize>, Id, SupportedCommand),
+    Processed(Range<usize>, Id, Command),
 }
 
 impl GCodeLine {

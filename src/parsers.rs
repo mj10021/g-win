@@ -2,7 +2,7 @@ use winnow::{
     ascii::{multispace0, till_line_ending}, combinator::{preceded, rest, separated_pair, todo}, error::InputError, stream::Range, token::{literal, one_of, take, take_till, take_until, take_while}, PResult, Parser
 };
 use std::collections::HashMap;
-use crate::{GCodeModel, GCodeLine};
+use crate::{GCodeLine, GCodeModel, G1, Command};
 
 
 pub fn parse_file(path: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
@@ -20,25 +20,25 @@ pub fn parse_file(path: &str) -> Result<Vec<String>, Box<dyn std::error::Error>>
 }
 
 fn outer_parser(input: &str) -> PResult<GCodeModel> {
-    let gcode = GCodeModel::default();
+    let mut gcode = GCodeModel::default();
     let input = winnow::Located::new(input);
     // split a file into lines and remove all whitespace
     while let Ok ((line, span)) = parse_line_with_span(input) {
         let (line, comments) = parse_comments(line)?;
-        let (command, rest) = parse_word(line)?;
+        let (command, mut rest) = parse_word(line)?;
         match command {
             "G1" => {
                 let mut input = rest;
-                let g1 = g1_parse(&mut input)?;
-                gcode.lines.push(GCodeLine::Processed(g1));
+                let g1 = g1_parameter_parse(&mut input)?;
+                gcode.lines.push(GCodeLine::Processed(span, gcode.id_counter.get(), Command::G1(g1)));
             }
             "G28" => todo!(),
-            "G90" => gcode.rel_xyz = false,
+            "G90" => {gcode.rel_xyz = false; gcode.lines.push(GCodeLine::Processed( span, gcode.id_counter.get(), crate::Command::G90))},
             "G91" => gcode.rel_xyz = true,
             "M82" => gcode.rel_e = false,
             "M83" => gcode.rel_e = true,
             _ => {
-                let original_input = String::from(&input[span]);
+                let original_input = String::from(&input[span.clone()]);
                 gcode.lines.push(GCodeLine::Unprocessed(span, gcode.id_counter.get(), original_input));
 
             }
@@ -116,8 +116,9 @@ fn g1_comment_parse<'a>(input: &mut &'a str) -> PResult<&'a str> {
     // should only be applied as final parse option
     preceded(';', rest).parse_next(input)
 }
-fn g1_parameter_parse<'a>(input: &mut &'a str) -> PResult<HashMap<char, String>> {
-    let mut out = HashMap::new();
+// FIXME: TEST THIS
+fn g1_parameter_parse<'a>(input: &mut &'a str) -> PResult<G1> {
+    let mut out = G1::default();
     while let Ok((c, val)) = separated_pair(
         one_of::<_, _, InputError<_>>(['X', 'Y', 'Z', 'E', 'F']),
         winnow::combinator::empty,
@@ -125,54 +126,14 @@ fn g1_parameter_parse<'a>(input: &mut &'a str) -> PResult<HashMap<char, String>>
     )
     .parse_next(input)
     {
-        out.insert(c, val);
+        match c {
+            'X' => out.x = Some(val),
+            'Y' => out.y = Some(val),
+            'Z' => out.z = Some(val),
+            'E' => out.e = Some(val),
+            'F' => out.f = Some(val),
+            _ => {}
+        }
     }
     Ok(out)
-}
-
-fn g1_parse_test() {}
-
-// Function that takes a processed G1 command and returns parameters
-fn g1_parse<'a>(input: &'a mut &'a str) -> PResult<G1> {
-    let ((span, _, params, _, comments),) = ((
-        clear_whitespace,
-        literal("G1"),
-        g1_parameter_parse,
-        literal(';'),
-        rest,
-    ),)
-        .parse_next(input)?;
-    let comments = {
-        if comments.is_empty() {
-            None
-        } else {
-            Some(String::from(comments))
-        }
-    };
-    let (x, y, z, e, f) = (
-        params.get(&'X').copied(),
-        params.get(&'Y').copied(),
-        params.get(&'Z').copied(),
-        params.get(&'E').copied(),
-        params.get(&'F').copied(),
-    );
-    Ok(G1 {
-        x,
-        y,
-        z,
-        e,
-        f,
-        comments,
-        span: String::new(),
-    })
-}
-
-fn line_parse<'a>(input: &'a mut &'a str, parsed: &mut Parsed) -> GCodeLine {
-    let id = parsed.id_counter.get();
-    let g1 = g1_parse(input);
-    if let Ok(g1) = g1 {
-        GCodeLine::Unprocessed(Id(0), String::new())
-    } else {
-        GCodeLine::Unprocessed(Id(0), String::new())
-    }
 }
