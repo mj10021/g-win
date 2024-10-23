@@ -1,5 +1,5 @@
 use winnow::{
-    ascii::{multispace0, till_line_ending}, combinator::{preceded, rest, separated_pair}, error::InputError, stream::Range, token::{literal, one_of, take, take_till, take_until, take_while}, PResult, Parser
+    ascii::{multispace0, till_line_ending}, combinator::{preceded, rest, separated_pair, todo}, error::InputError, stream::Range, token::{literal, one_of, take, take_till, take_until, take_while}, PResult, Parser
 };
 use std::collections::HashMap;
 use crate::{GCodeModel, GCodeLine};
@@ -18,33 +18,6 @@ pub fn parse_file(path: &str) -> Result<Vec<String>, Box<dyn std::error::Error>>
         .collect();
     Ok(out)
 }
-enum SupportedCommands {
-    G1,
-    G28,
-    G90,
-    G91,
-    M82,
-    M83
-}
-impl<'a> SupportedCommands {
-    fn get_key(&self) -> &str {
-        match self {
-            SupportedCommands::G1 => "G1",
-            SupportedCommands::G28 => "G28",
-            SupportedCommands::G90 => "G90",
-            SupportedCommands::G91 => "G91",
-            SupportedCommands::M82 => "M82",
-            SupportedCommands::M83 => "M83"
-        }
-    }
-    fn get_parser(&self) -> fn(&'a mut &'a str) -> PResult<GCodeLine> {
-        match self {
-            SupportedCommands::G1 => g1_parse,
-            _ => unimplemented!()
-        }
-    }
-}
-
 
 fn outer_parser(input: &str) -> PResult<GCodeModel> {
     let gcode = GCodeModel::default();
@@ -52,10 +25,23 @@ fn outer_parser(input: &str) -> PResult<GCodeModel> {
     // split a file into lines and remove all whitespace
     while let Ok ((line, span)) = parse_line_with_span(input) {
         let (line, comments) = parse_comments(line)?;
-        if let Ok(processed) = parse_line(line) {
-            gcode.lines.push(processed);
-        } else {
-            gcode.lines.push(GCodeLine::Unprocessed(Id(0), line.to_string()));
+        let (command, rest) = parse_word(line)?;
+        match command {
+            "G1" => {
+                let mut input = rest;
+                let g1 = g1_parse(&mut input)?;
+                gcode.lines.push(GCodeLine::Processed(g1));
+            }
+            "G28" => todo!(),
+            "G90" => gcode.rel_xyz = false,
+            "G91" => gcode.rel_xyz = true,
+            "M82" => gcode.rel_e = false,
+            "M83" => gcode.rel_e = true,
+            _ => {
+                let original_input = String::from(&input[span]);
+                gcode.lines.push(GCodeLine::Unprocessed(span, gcode.id_counter.get(), original_input));
+
+            }
         }
     }
     Ok(gcode)
