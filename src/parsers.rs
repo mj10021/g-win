@@ -1,5 +1,5 @@
 use winnow::{
-    ascii::{multispace0, till_line_ending}, combinator::{preceded, rest, separated_pair}, error::InputError, stream::Range, token::{literal, one_of, take, take_till, take_while}, PResult, Parser
+    ascii::{multispace0, till_line_ending}, combinator::{preceded, rest, separated_pair}, error::InputError, stream::Range, token::{literal, one_of, take, take_till, take_until, take_while}, PResult, Parser
 };
 use std::collections::HashMap;
 use crate::{GCodeModel, GCodeLine};
@@ -47,27 +47,32 @@ impl<'a> SupportedCommands {
 
 
 fn outer_parser(input: &str) -> PResult<GCodeModel> {
-    let mut gcode = GCodeModel::default();
+    let gcode = GCodeModel::default();
+    let input = winnow::Located::new(input);
     // split a file into lines and remove all whitespace
-    // FIXME: need to get the span for each line here
-    let lines = input.lines().filter_map(|s| {
-        match clear_whitespace(&mut s) {
-            Ok(s) => Some(s),
-            _ => None // ignore errors on clear whitespace, just skip that line 
-        }
-    });
-    for line in lines {
-        // try every parser until one matches
-        for parser in gcode_model.parsers.keys() {
-
+    while let Ok ((line, span)) = parse_line_with_span(input) {
+        let (line, comments) = parse_comments(line)?;
+        if let Ok(processed) = parse_line(line) {
+            gcode.lines.push(processed);
+        } else {
+            gcode.lines.push(GCodeLine::Unprocessed(Id(0), line.to_string()));
         }
     }
+    Ok(gcode)
 }
 
 fn parse_line_with_span(mut input: winnow::Located<&str>) -> PResult<(&str, std::ops::Range<usize>)> {
     let mut parser = till_line_ending.with_span();
     let (line, span) = parser.parse_next(&mut input)?;
     Ok((line, span))
+}
+
+// strips a comment from a line, returning a tuple of two strings separated by a ';'
+fn parse_comments(mut input: &str) -> PResult<(&str, &str)> {
+    let start = take_until(0.., ';').parse_next(&mut input)?;
+    let separator = take(1_usize).parse_next(&mut input)?;
+    assert_eq!(separator, ";");
+    Ok((start, input))
 }
 
 fn parse_word(mut input: &str) -> PResult<(&str, &str)> {
