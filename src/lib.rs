@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub mod emit;
 pub mod file;
 pub mod parsers;
@@ -61,6 +63,7 @@ pub struct GCodeLine {
     pub id: Id,
     pub span: Range<usize>,
     pub command: Command,
+    comments: String,
 }
 
 // intermediary struct for parsing line into vertex

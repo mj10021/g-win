@@ -1,7 +1,7 @@
 use crate::{Command, GCodeLine, GCodeModel, G1};
 use winnow::{
-    ascii::{multispace0, till_line_ending},
-    combinator::{preceded, rest, separated_pair},
+    ascii::till_line_ending,
+    combinator::separated_pair,
     error::InputError,
     token::{one_of, take, take_till, take_until, take_while},
     PResult, Parser,
@@ -46,6 +46,7 @@ fn outer_parser(input: &str) -> PResult<GCodeModel> {
             id,
             span,
             command,
+            comments: String::from(comments)
         });
     }
     Ok(gcode)
@@ -61,10 +62,25 @@ fn parse_line_with_span(
 
 // strips a comment from a line, returning a tuple of two strings separated by a ';'
 fn parse_comments(mut input: &str) -> PResult<(&str, &str)> {
+    if !input.contains(';') {
+        return Ok((input, ""));
+    }
     let start = take_until(0.., ';').parse_next(&mut input)?;
-    let separator = take(1_usize).parse_next(&mut input)?;
-    assert_eq!(separator, ";");
-    Ok((start, input))
+    let _separator = take(1_usize).parse_next(&mut input)?;
+    return Ok((start, input));
+}
+
+#[test]
+fn test_parse_comments() {
+    let tests = [
+        ("hello;world", ("hello", "world")),
+        ("hello;world;more", ("hello", "world;more")),
+        ("hello", ("hello", "")),
+    ];
+    for (input, expected) in tests.iter() {
+        let (start, rest) = parse_comments(input).unwrap();
+        assert_eq!((start, rest), *expected);
+    }
 }
 
 fn parse_word(mut input: &str) -> PResult<(&str, &str)> {
@@ -90,38 +106,6 @@ fn number_chars() {
     }
 }
 
-fn clear_whitespace(input: &mut &str) -> PResult<String> {
-    // String to accumulate the output
-    let mut out = String::new();
-
-    // Loop until all input is processed
-    loop {
-        // Consume whitespace and discard it
-        loop {
-            if multispace0::<&str, winnow::error::ErrorKind>(input).is_err() {
-                break;
-            }
-        }
-        // Capture a single non-whitespace character and append it to the output string
-        if let Ok(c) = take::<usize, &str, winnow::error::ErrorKind>(1_usize).parse_next(input) {
-            out.push_str(c);
-        }
-    }
-
-    Ok(out)
-}
-#[test]
-fn whitespace_test() {
-    let mut test = "       g  a  SS   a S d   d ";
-    let res = clear_whitespace(&mut test).unwrap();
-    assert_eq!(res.as_str(), "gaSSaSdd");
-}
-
-fn g1_comment_parse<'a>(input: &mut &'a str) -> PResult<&'a str> {
-    // return any characters following ';',
-    // should only be applied as final parse option
-    preceded(';', rest).parse_next(input)
-}
 // FIXME: TEST THIS
 fn g1_parameter_parse(input: &mut &str) -> PResult<G1> {
     let mut out = G1::default();
