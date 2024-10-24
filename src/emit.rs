@@ -1,4 +1,4 @@
-use crate::{GCodeLine, GCodeModel, Command, G1};
+use crate::{Command, GCodeLine, GCodeModel, G1};
 
 /// Trait objects that can be emitted to valid gcode, with an optional debug line appended
 pub trait Emit {
@@ -14,23 +14,28 @@ impl Emit for Command {
             Command::G91 => "G91".to_string(),
             Command::M82 => "M82".to_string(),
             Command::M83 => "M83".to_string(),
+            Command::Unsupported(s) => s.clone(),
         }
     }
 }
 
 impl Emit for GCodeLine {
     fn emit(&self, debug: bool) -> String {
-        match self {
-            GCodeLine::Unprocessed(_, _, raw_string) => raw_string.clone(),
-            GCodeLine::Processed(_, _, command) => command.emit(debug),
-        }
+        self.command.emit(debug)
     }
 }
 
 impl Emit for G1 {
     fn emit(&self, _debug: bool) -> String {
         let mut out = String::new();
-        let G1 {x, y, z, e, f, comments} = self;
+        let G1 {
+            x,
+            y,
+            z,
+            e,
+            f,
+            comments,
+        } = self;
         let params = [x, y, z, e, f, comments];
         for param in params {
             if let Some(param) = param {

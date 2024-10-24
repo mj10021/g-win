@@ -1,18 +1,31 @@
-use winnow::{
-    ascii::multispace0,
-    combinator::{preceded, rest, separated_pair},
-    error::InputError,
-    token::{literal, one_of, take, take_while},
-    PResult, Parser,
-};
-
 pub mod emit;
 pub mod file;
 pub mod parsers;
-use std::{collections::{HashMap, HashSet}, ops::Range};
-use std::io::Write;
+use std::{collections::HashMap, io::Write, ops::Range};
 
+#[derive(Clone, Debug, Default, PartialEq)]
+struct Counter {
+    count: u32,
+}
 
+impl Counter {
+    fn new() -> Self {
+        Counter { count: 0 }
+    }
+    fn get(&mut self) -> Id {
+        let out = self.count;
+        self.count += 1;
+        Id(out)
+    }
+}
+
+#[test]
+fn test_counter() {
+    let mut c = Counter::new();
+    assert_eq!(c.get(), Id(0));
+    assert_eq!(c.get(), Id(1));
+    assert_eq!(c.get(), Id(2));
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Id(u32);
@@ -21,13 +34,7 @@ impl Default for Id {
         Id(0)
     }
 }
-impl Id {
-    fn get(&mut self) -> Self {
-        let out = self.0;
-        self.0 += 1;
-        Id(out)
-    }
-}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Label {
     Uninitialized,
@@ -43,28 +50,21 @@ pub enum Label {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-enum Command {
+pub enum Command {
     G1(G1),
     G28,
     G90,
     G91,
     M82,
-    M83
+    M83,
+    Unsupported(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum GCodeLine {
-    Unprocessed(Range<usize>, Id, String),
-    Processed(Range<usize>, Id, Command),
-}
-
-impl GCodeLine {
-    fn id(&self) -> Id {
-        match self {
-            GCodeLine::Unprocessed(_, id, _) => *id,
-            GCodeLine::Processed(_, id, _) => *id,
-        }
-    }
+pub struct GCodeLine {
+    pub id: Id,
+    pub span: Range<usize>,
+    pub command: Command,
 }
 
 // intermediary struct for parsing line into vertex
@@ -271,7 +271,7 @@ pub struct GCodeModel {
     pub vertices: HashMap<Id, Vertex>,
     pub rel_xyz: bool,
     pub rel_e: bool,
-    id_counter: Id,
+    id_counter: Counter,
 }
 
 impl GCodeModel {

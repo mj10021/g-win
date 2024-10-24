@@ -1,53 +1,59 @@
+use crate::{Command, GCodeLine, GCodeModel, G1};
 use winnow::{
-    ascii::{multispace0, till_line_ending}, combinator::{preceded, rest, separated_pair, todo}, error::InputError, stream::Range, token::{literal, one_of, take, take_till, take_until, take_while}, PResult, Parser
+    ascii::{multispace0, till_line_ending},
+    combinator::{preceded, rest, separated_pair, todo},
+    error::InputError,
+    token::{one_of, take, take_till, take_until, take_while},
+    PResult, Parser,
 };
-use std::collections::HashMap;
-use crate::{GCodeLine, GCodeModel, G1, Command};
-
-
-pub fn parse_file(path: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let out = String::from_utf8(std::fs::read(path)?)?
-        .lines()
-        .filter_map(|s| {
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.to_string())
-            }
-        })
-        .collect();
-    Ok(out)
-}
 
 fn outer_parser(input: &str) -> PResult<GCodeModel> {
     let mut gcode = GCodeModel::default();
     let input = winnow::Located::new(input);
     // split a file into lines and remove all whitespace
-    while let Ok ((line, span)) = parse_line_with_span(input) {
+    while let Ok((line, span)) = parse_line_with_span(input) {
         let (line, comments) = parse_comments(line)?;
         let (command, mut rest) = parse_word(line)?;
-        match command {
+        let command = match command {
             "G1" => {
                 let mut input = rest;
                 let g1 = g1_parameter_parse(&mut input)?;
-                gcode.lines.push(GCodeLine::Processed(span, gcode.id_counter.get(), Command::G1(g1)));
+                Command::G1(g1)
             }
-            "G28" => todo!(),
-            "G90" => {gcode.rel_xyz = false; gcode.lines.push(GCodeLine::Processed( span, gcode.id_counter.get(), crate::Command::G90))},
-            "G91" => gcode.rel_xyz = true,
-            "M82" => gcode.rel_e = false,
-            "M83" => gcode.rel_e = true,
+            "G28" => crate::Command::G28,
+            "G90" => {
+                gcode.rel_xyz = false;
+                Command::G90
+            }
+            "G91" => {
+                gcode.rel_xyz = true;
+                Command::G91
+            }
+            "M82" => {
+                gcode.rel_e = false;
+                Command::M82
+            }
+            "M83" => {
+                gcode.rel_e = true;
+                Command::M83
+            }
             _ => {
-                let original_input = String::from(&input[span.clone()]);
-                gcode.lines.push(GCodeLine::Unprocessed(span, gcode.id_counter.get(), original_input));
-
+                Command::Unsupported(String::from(&input[span.clone()]))
             }
-        }
+        };
+        let id = gcode.id_counter.get();
+        gcode.lines.push(GCodeLine {
+            id,
+            span,
+            command,
+        });
     }
     Ok(gcode)
 }
 
-fn parse_line_with_span(mut input: winnow::Located<&str>) -> PResult<(&str, std::ops::Range<usize>)> {
+fn parse_line_with_span(
+    mut input: winnow::Located<&str>,
+) -> PResult<(&str, std::ops::Range<usize>)> {
     let mut parser = till_line_ending.with_span();
     let (line, span) = parser.parse_next(&mut input)?;
     Ok((line, span))
@@ -137,3 +143,6 @@ fn g1_parameter_parse<'a>(input: &mut &'a str) -> PResult<G1> {
     }
     Ok(out)
 }
+
+#[cfg(test)]
+const TEST_FILE: &str = "tests/test.gcode";
