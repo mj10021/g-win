@@ -90,7 +90,7 @@ fn number_chars() {
     }
 }
 
-fn clear_whitespace<'a>(input: &mut &'a str) -> PResult<String> {
+fn clear_whitespace(input: &mut &str) -> PResult<String> {
     // String to accumulate the output
     let mut out = String::new();
 
@@ -123,12 +123,12 @@ fn g1_comment_parse<'a>(input: &mut &'a str) -> PResult<&'a str> {
     preceded(';', rest).parse_next(input)
 }
 // FIXME: TEST THIS
-fn g1_parameter_parse<'a>(input: &mut &'a str) -> PResult<G1> {
+fn g1_parameter_parse(input: &mut &str) -> PResult<G1> {
     let mut out = G1::default();
     while let Ok((c, val)) = separated_pair(
         one_of::<_, _, InputError<_>>(['X', 'Y', 'Z', 'E', 'F']),
         winnow::combinator::empty,
-        take_while(1.., |c| is_number_char(c)).parse_to(),
+        take_while(1.., is_number_char).parse_to(),
     )
     .parse_next(input)
     {

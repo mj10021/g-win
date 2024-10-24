@@ -28,12 +28,8 @@ fn test_counter() {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+#[derive(Default)]
 pub struct Id(u32);
-impl Default for Id {
-    fn default() -> Self {
-        Id(0)
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Label {
@@ -134,7 +130,7 @@ impl Pos {
                 Pos::home()
             }
         };
-        let mut out = prev.clone();
+        let mut out = prev;
         for param in g1.params() {
             match param {
                 ("X", val) => out.x = val.parse().unwrap(),
