@@ -1,7 +1,7 @@
 use crate::{Command, GCodeLine, GCodeModel, G1};
 use winnow::{
     ascii::{multispace0, till_line_ending},
-    combinator::{preceded, rest, separated_pair, todo},
+    combinator::{preceded, rest, separated_pair},
     error::InputError,
     token::{one_of, take, take_till, take_until, take_while},
     PResult, Parser,
@@ -13,7 +13,7 @@ fn outer_parser(input: &str) -> PResult<GCodeModel> {
     // split a file into lines and remove all whitespace
     while let Ok((line, span)) = parse_line_with_span(input) {
         let (line, comments) = parse_comments(line)?;
-        let (command, mut rest) = parse_word(line)?;
+        let (command, rest) = parse_word(line)?;
         let command = match command {
             "G1" => {
                 let mut input = rest;
