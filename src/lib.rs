@@ -29,8 +29,7 @@ fn test_counter() {
     assert_eq!(c.get(), Id(2));
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-#[derive(Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub struct Id(u32);
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -61,7 +60,7 @@ pub enum Command {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct GCodeLine {
     pub id: Id,
-    pub span: Range<usize>,
+    pub line_number: usize,
     pub command: Command,
     comments: String,
 }
