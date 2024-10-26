@@ -175,9 +175,8 @@ fn g1_parameter_parse_test() {
                 comments: None,
             },
         )];
-    for (input, expected) in tests.iter_mut() {
-        let mut input = input;
-        let result = g1_parameter_parse(input).unwrap();
+    for (mut input, expected) in tests.iter_mut() {
+        let result = g1_parameter_parse(&mut input).unwrap();
         assert_eq!(result, *expected);
     }
 }
@@ -242,8 +241,8 @@ fn outer_parser_test() {
     let input = "G1 X1.0 Y2.0 Z3.0 E4.0 F5.0; hello world\nG28; hello world\nG90; hello world\nG91; hello world\nM82".to_string();
     let result = outer_parser(input).unwrap();
     let expected = GCodeModel {
-        id_counter: crate::Counter::new(),
-        rel_xyz: false,
+        id_counter: crate::Counter { count: 5 },
+        rel_xyz: true,
         rel_e: false,
         lines: vec![
             GCodeLine {
@@ -255,7 +254,7 @@ fn outer_parser_test() {
                     z: Some(String::from("3.0")),
                     e: Some(String::from("4.0")),
                     f: Some(String::from("5.0")),
-                    comments: Some(String::from("")),
+                    comments: None,
                 }),
                 comments: String::from(" hello world"),
             },
@@ -284,6 +283,6 @@ fn outer_parser_test() {
                 comments: String::from(""),
             },
         ],
-        vertices: HashMap::new(),
     };
+    assert_eq!(result, expected);
 }
