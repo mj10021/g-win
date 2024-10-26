@@ -3,7 +3,7 @@
 pub mod emit;
 pub mod file;
 pub mod parsers;
-use std::{collections::HashMap, io::Write, ops::Range};
+use std::{collections::HashMap, io::Write};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 struct Counter {
