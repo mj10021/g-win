@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 
 use crate::{Command, GCodeLine, GCodeModel, G1};
 use winnow::{
@@ -14,7 +13,7 @@ fn parse_comments(mut input: &str) -> PResult<(&str, &str)> {
         return Ok((input, ""));
     }
     let (start, _separator) = (take_until(0.., ';'), take(1_usize)).parse_next(&mut input)?;
-    return Ok((start, input));
+    Ok((start, input))
 }
 
 #[test]
@@ -33,12 +32,12 @@ fn test_parse_comments() {
 }
 
 fn parse_word(mut input: &str) -> PResult<(&str, &str, &str)> {
-    Ok((
+    (
         take(1_usize),
         take_while(0.., |c: char| c.is_numeric()),
         rest,
     )
-        .parse_next(&mut input)?)
+        .parse_next(&mut input)
 }
 
 #[test]
@@ -53,7 +52,7 @@ fn test_parse_word() {
         ),
     ];
     for (input, expected) in tests.iter() {
-        assert_eq!(parse_word(*input).unwrap(), *expected);
+        assert_eq!(parse_word(input).unwrap(), *expected);
     }
 }
 
@@ -178,7 +177,7 @@ fn g1_parameter_parse_test() {
         )];
     for (input, expected) in tests.iter_mut() {
         let mut input = input;
-        let result = g1_parameter_parse(&mut input).unwrap();
+        let result = g1_parameter_parse(input).unwrap();
         assert_eq!(result, *expected);
     }
 }
