@@ -8,13 +8,20 @@ use winnow::{
 };
 
 fn parse_line(input: &mut &str) -> PResult<String> {
-    // parse until newline
-    let first = take_till(1.., |c| c == '\n' || c == '\r').parse_next(input)?;
+    if input.len() == 0 {
+        return Ok("".to_string());
+    }
+    if input.len() == 1 {
+        let c = take(1_usize).parse_next(input)?;
+        match c {
+            "\n" | "\r" => return Ok("".to_string()),
+            _ => return Ok(String::from(c)),
+        }
+    }
+    // parse until newline and clear whitespace
+    let (line, _) = (take_till(1.., |c| c == '\n' || c == '\r'), multispace0).parse_next(input)?;
 
-    // clear any whitespace
-    let _ = multispace0.parse_next(input)?;
-
-    Ok(String::from(first))
+    Ok(String::from(line))
 }
 
 #[test]
@@ -27,15 +34,20 @@ fn parse_line_test() {
         ("hello\nworld\nmore", "hello"),
         ("hello\nworld\nmore\n", "hello"),
         ("hello\nworld\nmore\n\n", "hello"),
+        ("\n", ""),
+        ("\r", ""),
+        ("", ""),
     ];
     for (input, expected) in tests.iter_mut() {
-        let result = parse_line(input).unwrap();
+        let result = parse_line(input).expect(format!("failed to parse: {}", input).as_str());
         assert_eq!(result, *expected);
     }
 }
 
-fn parse_lines(input: &mut &str) -> PResult<Vec<String>> {
-    repeat(0.., parse_line).parse_next(input)
+fn parse_lines(input: &mut &str) -> Result<Vec<String>, GCodeParseError> {
+    repeat(0.., parse_line)
+        .parse(input)
+        .map_err(|e| GCodeParseError::from_parse(e, input))
 }
 
 #[test]
@@ -47,6 +59,7 @@ fn test_parse_lines() {
         ("hello", vec!["hello"]),
         ("hello\n", vec!["hello"]),
         ("\n", vec![]),
+        ("\r", vec![]),
         ("", vec![]),
     ];
     for (input, expected) in tests.iter_mut() {
