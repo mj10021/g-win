@@ -4,4 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+annotate-snippets = "0.11.4"
 winnow = "0.6.20"

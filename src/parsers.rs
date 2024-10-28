@@ -1,12 +1,59 @@
-
 use crate::{Command, GCodeLine, GCodeModel, G1};
 use winnow::{
-    combinator::{rest, separated_pair},
+    ascii::{line_ending, multispace0},
+    combinator::{alt, empty, eof, repeat, rest, separated_pair},
     error::InputError,
-    token::{one_of, take, take_until, take_while},
+    token::{any, one_of, take, take_till, take_until, take_while},
     PResult, Parser,
 };
 
+fn parse_line(input: &mut &str) -> PResult<String> {
+    // parse until newline
+    let first = take_till(1.., |c| c == '\n' || c == '\r').parse_next(input)?;
+
+    // clear any whitespace
+    let _ = multispace0.parse_next(input)?;
+
+    Ok(String::from(first))
+}
+
+#[test]
+fn parse_line_test() {
+    let mut tests = [
+        ("hello\n", "hello"),
+        ("hello", "hello"),
+        ("hello\nworld", "hello"),
+        ("hello\nworld\n", "hello"),
+        ("hello\nworld\nmore", "hello"),
+        ("hello\nworld\nmore\n", "hello"),
+        ("hello\nworld\nmore\n\n", "hello"),
+    ];
+    for (input, expected) in tests.iter_mut() {
+        let result = parse_line(input).unwrap();
+        assert_eq!(result, *expected);
+    }
+}
+
+fn parse_lines(input: &mut &str) -> PResult<Vec<String>> {
+    repeat(0.., parse_line).parse_next(input)
+}
+
+#[test]
+fn test_parse_lines() {
+    let mut tests = [
+        ("hello\nworld\nmore\n", vec!["hello", "world", "more"]),
+        ("hello\nworld\nmore", vec!["hello", "world", "more"]),
+        ("hello\nworld\nmore\n\n", vec!["hello", "world", "more"]),
+        ("hello", vec!["hello"]),
+        ("hello\n", vec!["hello"]),
+        ("\n", vec![]),
+        ("", vec![]),
+    ];
+    for (input, expected) in tests.iter_mut() {
+        let result = parse_lines(input).unwrap();
+        assert_eq!(result, *expected);
+    }
+}
 // strips a comment from a line, returning a tuple of two strings separated by a ';'
 fn parse_comments(mut input: &str) -> PResult<(&str, &str)> {
     if !input.contains(';') {
@@ -174,36 +221,87 @@ fn g1_parameter_parse_test() {
                 f: None,
                 comments: None,
             },
-        )];
+        ),
+    ];
     for (mut input, expected) in tests.iter_mut() {
         let result = g1_parameter_parse(&mut input).unwrap();
         assert_eq!(result, *expected);
     }
 }
 
-fn outer_parser(input: String) -> PResult<GCodeModel> {
+#[derive(Debug)]
+pub struct GCodeParseError {
+    message: String,
+    // Byte spans are tracked, rather than line and column.
+    // This makes it easier to operate on programmatically
+    // and doesn't limit us to one definition for column count
+    // which can depend on the output medium and application.
+    span: std::ops::Range<usize>,
+    input: String,
+}
+
+impl GCodeParseError {
+    pub fn from_parse(
+        error: winnow::error::ParseError<&str, winnow::error::ContextError>,
+        input: &str,
+    ) -> Self {
+        // The default renderer for `ContextError` is still used but that can be
+        // customized as well to better fit your needs.
+        let message = error.inner().to_string();
+        let input = input.to_owned();
+        let start = error.offset();
+        // Assume the error span is only for the first `char`.
+        // Semantic errors are free to choose the entire span returned by `Parser::with_span`.
+        let end = (start + 1..)
+            .find(|e| input.is_char_boundary(*e))
+            .unwrap_or(start);
+        Self {
+            message,
+            span: start..end,
+            input,
+        }
+    }
+}
+
+impl std::fmt::Display for GCodeParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let message = annotate_snippets::Level::Error
+            .title(&self.message)
+            .snippet(
+                annotate_snippets::Snippet::source(&self.input)
+                    .fold(true)
+                    .annotation(annotate_snippets::Level::Error.span(self.span.clone())),
+            );
+        let renderer = annotate_snippets::Renderer::plain();
+        let rendered = renderer.render(message);
+        rendered.fmt(f)
+    }
+}
+
+impl std::error::Error for GCodeParseError {}
+
+pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
     let mut gcode = GCodeModel::default();
     let lines = input.lines();
     // split a file into lines
     for (i, line) in lines.enumerate() {
-
         // store a copy of the original line
         let string_copy = String::from(line);
 
         // parse comments
-        let (line, comments) = parse_comments(line)?;
+        let (line, comments) = parse_comments(line).unwrap();
 
         // clear whitespace
         let line = line.split_whitespace().collect::<String>();
         let line = line.as_str();
 
         // split off first word from command
-        let (command, num,  mut rest) = parse_word(line)?;
+        let (command, num, mut rest) = parse_word(line).unwrap();
 
         // process rest of command based on first word
         let command = match (command, num) {
             ("G", "1") => {
-                let g1 = g1_parameter_parse(&mut rest)?;
+                let g1 = g1_parameter_parse(&mut rest).unwrap();
                 Command::G1(g1)
             }
             ("G", "28") => crate::Command::G28,
@@ -237,9 +335,10 @@ fn outer_parser(input: String) -> PResult<GCodeModel> {
 }
 
 #[test]
-fn outer_parser_test() {
+fn gcode_parser_test() {
     let input = "G1 X1.0 Y2.0 Z3.0 E4.0 F5.0; hello world\nG28; hello world\nG90; hello world\nG91; hello world\nM82".to_string();
-    let result = outer_parser(input).unwrap();
+    let mut input = input.as_str();
+    let result = gcode_parser(&mut input).unwrap();
     let expected = GCodeModel {
         id_counter: crate::Counter { count: 5 },
         rel_xyz: true,

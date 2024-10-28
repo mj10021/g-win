@@ -3,6 +3,7 @@ pub mod file;
 pub mod parsers;
 use std::io::Write;
 
+use winnow::error::ErrMode;
 #[derive(Clone, Debug, Default, PartialEq)]
 struct Counter {
     count: u32,
@@ -83,7 +84,23 @@ pub struct GCodeModel {
     id_counter: Counter,
 }
 
+use parsers::GCodeParseError;
+impl std::str::FromStr for GCodeModel {
+    type Err = GCodeParseError;
+    fn from_str(mut s: &str) -> Result<Self, Self::Err> {
+        let gcode = parsers::gcode_parser(&mut s);
+        match gcode {
+            Ok(gcode) => Ok(gcode),
+            Err(e) => Err(e),
+        }
+    }
+}
+
 impl GCodeModel {
+    pub fn from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let gcode = file::open_gcode_file(path)?;
+        Ok(parsers::gcode_parser(&mut gcode.as_str())?)
+    }
     pub fn write_to_file(&self, path: &str) -> Result<(), std::io::Error> {
         use emit::Emit;
         use std::fs::File;
