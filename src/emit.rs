@@ -27,7 +27,7 @@ impl Emit for GCodeLine {
 
 impl Emit for G1 {
     fn emit(&self, _debug: bool) -> String {
-        let mut out = String::new();
+        let mut out = String::from("G1 ");
         let G1 {
             x,
             y,
@@ -36,9 +36,11 @@ impl Emit for G1 {
             f,
             comments,
         } = self;
-        let params = [x, y, z, e, f, comments];
-        for param in params.into_iter().flatten() {
-            out += param.as_str();
+        let params = vec![('X', x), ('Y', y), ('Z', z), ('E', e), ('F', f), (';', comments)];
+        for (letter, param) in params {
+            if let Some(param) = param {
+                out += format!("{}{} ", letter, param).as_str();
+            }
         }
         out
     }
@@ -46,10 +48,6 @@ impl Emit for G1 {
 
 impl Emit for GCodeModel {
     fn emit(&self, debug: bool) -> String {
-        let mut out = String::new();
-        for line in &self.lines {
-            out += line.emit(debug).as_str();
-        }
-        out
+        self.lines.iter().map(|line| line.emit(debug)).collect::<Vec<_>>().join("\n")
     }
 }

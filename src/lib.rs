@@ -109,10 +109,32 @@ impl GCodeModel {
 }
 
 #[cfg(test)]
+
+fn test_gcode_path() -> std::path::PathBuf {
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
+    std::path::Path::new(&manifest_dir).join("src").join("tests")
+}
+
 #[test]
 fn integration_test() {
+    let input = test_gcode_path().join("test.gcode");
+    let output = test_gcode_path().join("output").join("test_output.gcode");
     let gcode =
-        GCodeModel::from_file(r#"C:\Users\james\Documents\g-win\src\tests\test.gcode"#).unwrap();
+        GCodeModel::from_file(input.as_os_str().to_str().unwrap()).unwrap();
     assert_eq!(gcode.rel_xyz, false);
     assert_eq!(gcode.rel_e, true);
+    use std::fs::File;
+    use std::io::Write;
+    use crate::emit::Emit;
+    let mut f = File::create(output.clone()).unwrap();
+    f.write_all(gcode.emit(false).as_bytes()).unwrap();
+    let gcode2 = GCodeModel::from_file(output.as_os_str().to_str().unwrap()).unwrap();
+    let (lines_a, lines_b) = (gcode.lines, gcode2.lines);
+    assert_eq!(lines_a.len(), lines_b.len());
+    // take a diff of both files
+    let set_a = lines_a.iter().collect::<std::collections::HashSet<_>>();
+    let set_b = lines_b.iter().collect::<std::collections::HashSet<_>>();
+    let diff = set_a.symmetric_difference(&set_b);
+    assert!(diff.clone().into_iter().count() == 0, "diff: {:?}", diff);
+
 }
