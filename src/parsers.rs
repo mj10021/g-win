@@ -66,11 +66,11 @@ fn test_parse_lines() {
     }
 }
 // strips a comment from a line, returning a tuple of two strings separated by a ';'
-fn parse_comments(mut input: &str) -> PResult<(&str, &str)> {
+fn parse_comments<'a>(input: &mut &'a str) -> PResult<(&'a str, &'a str)> {
     if !input.contains(';') {
         return Ok((input, ""));
     }
-    let (start, _separator) = (take_until(0.., ';'), take(1_usize)).parse_next(&mut input)?;
+    let (start, _separator) = (take_until(0.., ';'), take(1_usize)).parse_next(input)?;
     Ok((start, input))
 }
 
@@ -83,19 +83,19 @@ fn test_parse_comments() {
         ("hello;", ("hello", "")),
         (";", ("", "")),
     ];
-    for (input, expected) in tests.iter() {
-        let (start, rest) = parse_comments(input).unwrap();
+    for (mut input, expected) in tests.iter() {
+        let (start, rest) = parse_comments(&mut input).unwrap();
         assert_eq!((start, rest), *expected);
     }
 }
 
-fn parse_word(mut input: &str) -> PResult<(&str, &str, &str)> {
+fn parse_word<'a>(input: &mut &'a str) -> PResult<(&'a str, &'a str, &'a str)> {
     (
         take(1_usize),
         take_while(0.., |c: char| c.is_numeric()),
         rest,
     )
-        .parse_next(&mut input)
+        .parse_next(input)
 }
 
 #[test]
@@ -109,8 +109,8 @@ fn test_parse_word() {
             ("G", "1", " X1.0 Y2.0 Z3.0 E4.0 F5.0"),
         ),
     ];
-    for (input, expected) in tests.iter() {
-        assert_eq!(parse_word(input).unwrap(), *expected);
+    for (mut input, expected) in tests.iter() {
+        assert_eq!(parse_word(&mut input).unwrap(), *expected);
     }
 }
 
@@ -297,20 +297,30 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
         .parse(input)
         .map_err(|e| GCodeParseError::from_parse(e, input))?;
     // split a file into lines
-    for (i, line) in lines.into_iter().enumerate() {
+    for (i, mut line) in lines.into_iter().enumerate() {
         // store a copy of the original line
         let string_copy = String::from(line);
 
         // parse comments
-        let (line, comments) = parse_comments(line).unwrap();
+        let (line, comments) = parse_comments.parse_next(&mut line).unwrap();
 
         // clear whitespace
         let line = line.split_whitespace().collect::<String>();
-        let line = line.as_str();
+        let mut line = line.as_str();
 
         // split off first word from command
-        let (command, num, mut rest) = parse_word(line).unwrap();
+        let parsed_word = parse_word.parse_next(&mut line);
 
+        if parsed_word.is_err() {
+            let id = gcode.id_counter.get();
+            gcode.lines.push(GCodeLine {
+                id,
+                line_number: i,
+                command: Command::Unsupported(string_copy.clone()),
+                comments: String::from(comments),
+            });
+        }
+        let (command, num, mut rest) = parsed_word.unwrap();
         // process rest of command based on first word
         let command = match (command, num) {
             ("G", "1") => {

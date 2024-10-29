@@ -6,8 +6,8 @@ pub fn open_gcode_file(path: &str) -> Result<String, Box<dyn std::error::Error>>
         .and_then(|ext| ext.to_str())
     {
         match extension {
-            ".gcode" => return Ok(String::from_utf8(std::fs::read(path)?)?),
-            _ => return Err(Box::from("unsupported extension")),
+            "gcode" => return Ok(String::from_utf8(std::fs::read(path)?)?),
+            _ => return Err(Box::from(format!("invalid file extension: {}", extension))),
         }
     }
     Err(Box::from("unable to parse file extension"))

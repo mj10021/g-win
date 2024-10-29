@@ -107,3 +107,12 @@ impl GCodeModel {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[test]
+fn integration_test() {
+    let gcode =
+        GCodeModel::from_file(r#"C:\Users\james\Documents\g-win\src\tests\test.gcode"#).unwrap();
+    assert_eq!(gcode.rel_xyz, false);
+    assert_eq!(gcode.rel_e, true);
+}
