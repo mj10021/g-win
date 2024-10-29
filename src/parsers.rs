@@ -131,7 +131,6 @@ fn number_chars() {
     }
 }
 
-// FIXME: TEST THIS
 fn g1_parameter_parse(input: &mut &str) -> PResult<G1> {
     let mut out = G1::default();
     while let Ok((c, val)) = separated_pair(
