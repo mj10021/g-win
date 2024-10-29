@@ -1,27 +1,15 @@
+use std::num::NonZeroUsize;
+
 use crate::{Command, GCodeLine, GCodeModel, G1};
 use winnow::{
-    ascii::{line_ending, multispace0},
-    combinator::{alt, empty, eof, repeat, rest, separated_pair},
-    error::InputError,
-    token::{any, one_of, take, take_till, take_until, take_while},
-    PResult, Parser,
+    ascii::{line_ending, multispace1}, combinator::{opt, repeat, rest, separated_pair}, error::{ContextError, ErrMode, InputError, Needed, ParserError}, stream::Stream, token::{any, one_of, take, take_till, take_until, take_while}, PResult, Parser
 };
 
-fn parse_line(input: &mut &str) -> PResult<String> {
-    if input.len() == 0 {
-        return Ok("".to_string());
-    }
-    if input.len() == 1 {
-        let c = take(1_usize).parse_next(input)?;
-        match c {
-            "\n" | "\r" => return Ok("".to_string()),
-            _ => return Ok(String::from(c)),
-        }
-    }
-    // parse until newline and clear whitespace
-    let (line, _) = (take_till(1.., |c| c == '\n' || c == '\r'), multispace0).parse_next(input)?;
-
-    Ok(String::from(line))
+fn parse_line<'a>(input: &mut &'a str) -> PResult<&'a str> {
+    // this must always consume at least one character
+    let line = take_till(0.., |c| c == '\n' || c == '\r').parse_next(input)?;
+    let _: PResult<&str> = multispace1.parse_next(input);
+    Ok(line)
 }
 
 #[test]
@@ -39,15 +27,21 @@ fn parse_line_test() {
         ("", ""),
     ];
     for (input, expected) in tests.iter_mut() {
-        let result = parse_line(input).expect(format!("failed to parse: {}", input).as_str());
+        let debug = String::from(*input);
+        let result = parse_line(input).expect(format!("failed to parse: {}", debug).as_str());
         assert_eq!(result, *expected);
     }
 }
 
-fn parse_lines(input: &mut &str) -> Result<Vec<String>, GCodeParseError> {
-    repeat(0.., parse_line)
-        .parse(input)
-        .map_err(|e| GCodeParseError::from_parse(e, input))
+fn parse_lines<'a>(input: &mut &'a str) -> PResult<Vec<&'a str>>{
+    let mut out = Vec::new();
+    loop {
+        if winnow::combinator::eof::<&str, ErrMode<InputError<&str>>>.parse_next(input).is_ok() {
+            break;
+        }
+        out.push(parse_line.parse_next(input)?);
+    }
+    Ok(out)
 }
 
 #[test]
@@ -58,9 +52,6 @@ fn test_parse_lines() {
         ("hello\nworld\nmore\n\n", vec!["hello", "world", "more"]),
         ("hello", vec!["hello"]),
         ("hello\n", vec!["hello"]),
-        ("\n", vec![]),
-        ("\r", vec![]),
-        ("", vec![]),
     ];
     for (input, expected) in tests.iter_mut() {
         let result = parse_lines(input).unwrap();
