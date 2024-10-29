@@ -1,8 +1,10 @@
-use std::num::NonZeroUsize;
-
 use crate::{Command, GCodeLine, GCodeModel, G1};
 use winnow::{
-    ascii::{line_ending, multispace1}, combinator::{opt, repeat, rest, separated_pair}, error::{ContextError, ErrMode, InputError, Needed, ParserError}, stream::Stream, token::{any, one_of, take, take_till, take_until, take_while}, PResult, Parser
+    ascii::multispace1,
+    combinator::{eof, rest, separated_pair},
+    error::{ErrMode, InputError},
+    token::{one_of, take, take_till, take_until, take_while},
+    PResult, Parser,
 };
 
 fn parse_line<'a>(input: &mut &'a str) -> PResult<&'a str> {
@@ -33,10 +35,13 @@ fn parse_line_test() {
     }
 }
 
-fn parse_lines<'a>(input: &mut &'a str) -> PResult<Vec<&'a str>>{
+fn parse_lines<'a>(input: &mut &'a str) -> PResult<Vec<&'a str>> {
     let mut out = Vec::new();
     loop {
-        if winnow::combinator::eof::<&str, ErrMode<InputError<&str>>>.parse_next(input).is_ok() {
+        if eof::<&str, ErrMode<InputError<&str>>>
+            .parse_next(input)
+            .is_ok()
+        {
             break;
         }
         out.push(parse_line.parse_next(input)?);
@@ -52,6 +57,8 @@ fn test_parse_lines() {
         ("hello\nworld\nmore\n\n", vec!["hello", "world", "more"]),
         ("hello", vec!["hello"]),
         ("hello\n", vec!["hello"]),
+        ("\n", vec![""]),
+        ("", vec![]),
     ];
     for (input, expected) in tests.iter_mut() {
         let result = parse_lines(input).unwrap();
@@ -286,9 +293,11 @@ impl std::error::Error for GCodeParseError {}
 
 pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
     let mut gcode = GCodeModel::default();
-    let lines = input.lines();
+    let lines = parse_lines
+        .parse(input)
+        .map_err(|e| GCodeParseError::from_parse(e, input))?;
     // split a file into lines
-    for (i, line) in lines.enumerate() {
+    for (i, line) in lines.into_iter().enumerate() {
         // store a copy of the original line
         let string_copy = String::from(line);
 

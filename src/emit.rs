@@ -37,10 +37,8 @@ impl Emit for G1 {
             comments,
         } = self;
         let params = [x, y, z, e, f, comments];
-        for param in params {
-            if let Some(param) = param {
-                out += param.as_str();
-            }
+        for param in params.into_iter().flatten() {
+            out += param.as_str();
         }
         out
     }

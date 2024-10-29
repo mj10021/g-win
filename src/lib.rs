@@ -3,16 +3,12 @@ pub mod file;
 pub mod parsers;
 use std::io::Write;
 
-use winnow::error::ErrMode;
 #[derive(Clone, Debug, Default, PartialEq)]
 struct Counter {
     count: u32,
 }
 
 impl Counter {
-    fn new() -> Self {
-        Counter { count: 0 }
-    }
     fn get(&mut self) -> Id {
         let out = self.count;
         self.count += 1;
@@ -22,7 +18,7 @@ impl Counter {
 
 #[test]
 fn test_counter() {
-    let mut c = Counter::new();
+    let mut c = Counter::default();
     assert_eq!(c.get(), Id(0));
     assert_eq!(c.get(), Id(1));
     assert_eq!(c.get(), Id(2));
