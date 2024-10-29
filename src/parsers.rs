@@ -293,7 +293,7 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
             gcode.lines.push(GCodeLine {
                 id,
                 line_number: i,
-                command: Command::Unsupported(string_copy.clone()),
+                command: Command::Raw(string_copy.clone()),
                 comments: String::from(comments),
             });
             continue;
@@ -323,7 +323,7 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
                 gcode.rel_e = true;
                 Command::M83
             }
-            _ => Command::Unsupported(string_copy),
+            _ => Command::Raw(string_copy),
         };
         let id = gcode.id_counter.get();
         gcode.lines.push(GCodeLine {
@@ -361,7 +361,7 @@ fn gcode_parser_test() {
             GCodeLine {
                 id: crate::Id(1),
                 line_number: 1,
-                command: Command::Unsupported(String::from("G28 W ")),
+                command: Command::Raw(String::from("G28 W ")),
                 comments: String::from(" hello world"),
             },
             GCodeLine {
@@ -385,7 +385,7 @@ fn gcode_parser_test() {
             GCodeLine {
                 id: crate::Id(5),
                 line_number: 5,
-                command: Command::Unsupported(String::from("")),
+                command: Command::Raw(String::from("")),
                 comments: String::from(" asdf"),
             },
         ],

@@ -13,7 +13,7 @@ impl Emit for Command {
             Command::G91 => "G91".to_string(),
             Command::M82 => "M82".to_string(),
             Command::M83 => "M83".to_string(),
-            Command::Unsupported(s) => s.clone(),
+            Command::Raw(s) => s.clone(),
         }
     }
 }

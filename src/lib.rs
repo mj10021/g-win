@@ -48,7 +48,7 @@ pub enum Command {
     G91,
     M82,
     M83,
-    Unsupported(String),
+    Raw(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
