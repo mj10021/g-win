@@ -319,12 +319,15 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
                 command: Command::Unsupported(string_copy.clone()),
                 comments: String::from(comments),
             });
+            continue;
         }
         let (command, num, mut rest) = parsed_word.unwrap();
         // process rest of command based on first word
         let command = match (command, num) {
             ("G", "1") => {
-                let g1 = g1_parameter_parse(&mut rest).unwrap();
+                let g1 = g1_parameter_parse
+                    .parse(&mut rest)
+                    .map_err(|e| GCodeParseError::from_parse(e, input))?;
                 Command::G1(g1)
             }
             ("G", "28") => crate::Command::G28,
