@@ -44,7 +44,6 @@ pub enum Label {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Command {
     G1(G1),
-    G28,
     G90,
     G91,
     M82,
@@ -69,7 +68,6 @@ pub struct G1 {
     pub z: Option<String>,
     pub e: Option<String>,
     pub f: Option<String>,
-    pub comments: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

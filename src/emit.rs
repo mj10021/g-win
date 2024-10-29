@@ -9,7 +9,6 @@ impl Emit for Command {
     fn emit(&self, debug: bool) -> String {
         match self {
             Command::G1(g1) => g1.emit(debug),
-            Command::G28 => "G28".to_string(),
             Command::G90 => "G90".to_string(),
             Command::G91 => "G91".to_string(),
             Command::M82 => "M82".to_string(),
@@ -21,7 +20,7 @@ impl Emit for Command {
 
 impl Emit for GCodeLine {
     fn emit(&self, debug: bool) -> String {
-        self.command.emit(debug)
+        self.command.emit(debug) + self.comments.as_str()
     }
 }
 
@@ -34,9 +33,8 @@ impl Emit for G1 {
             z,
             e,
             f,
-            comments,
         } = self;
-        let params = vec![('X', x), ('Y', y), ('Z', z), ('E', e), ('F', f), (';', comments)];
+        let params = vec![('X', x), ('Y', y), ('Z', z), ('E', e), ('F', f)];
         for (letter, param) in params {
             if let Some(param) = param {
                 out += format!("{}{} ", letter, param).as_str();

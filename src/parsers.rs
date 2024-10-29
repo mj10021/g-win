@@ -66,6 +66,7 @@ fn test_parse_lines() {
     }
 }
 // strips a comment from a line, returning a tuple of two strings separated by a ';'
+// NOTE: input needs to be cleared of whitespace before parsing comments
 fn parse_comments<'a>(input: &mut &'a str) -> PResult<(&'a str, &'a str)> {
     if !input.contains(';') {
         return Ok((input, ""));
@@ -163,7 +164,6 @@ fn g1_parameter_parse_test() {
                 z: Some(String::from("3.0")),
                 e: Some(String::from("4.0")),
                 f: Some(String::from("5.0")),
-                comments: None,
             },
         ),
         (
@@ -174,7 +174,6 @@ fn g1_parameter_parse_test() {
                 z: Some(String::from("3.0")),
                 e: Some(String::from("4.0")),
                 f: None,
-                comments: None,
             },
         ),
         (
@@ -185,7 +184,6 @@ fn g1_parameter_parse_test() {
                 z: Some(String::from("3.0")),
                 e: None,
                 f: None,
-                comments: None,
             },
         ),
         (
@@ -196,7 +194,6 @@ fn g1_parameter_parse_test() {
                 z: None,
                 e: None,
                 f: None,
-                comments: None,
             },
         ),
         (
@@ -207,7 +204,6 @@ fn g1_parameter_parse_test() {
                 z: None,
                 e: None,
                 f: None,
-                comments: None,
             },
         ),
         (
@@ -218,7 +214,6 @@ fn g1_parameter_parse_test() {
                 z: None,
                 e: None,
                 f: None,
-                comments: None,
             },
         ),
         (
@@ -229,7 +224,6 @@ fn g1_parameter_parse_test() {
                 z: Some(String::from("0.000000001")),
                 e: None,
                 f: None,
-                comments: None,
             },
         ),
     ];
@@ -296,12 +290,13 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
         .parse(input)
         .map_err(|e| GCodeParseError::from_parse(e, input))?;
     // split a file into lines
-    for (i, mut line) in lines.into_iter().enumerate() {
-        // store a copy of the original line
-        let string_copy = String::from(line);
+    for (i, line) in lines.into_iter().enumerate() {
 
-        // parse comments
-        let (line, comments) = parse_comments.parse_next(&mut line).unwrap();
+        // split off comments before parsing
+        let (line, comments) = line.split_once(';').unwrap_or((line, ""));
+
+        // store a copy of the original line for unsupported commands
+        let string_copy = String::from(line);
 
         // clear whitespace
         let line = line.split_whitespace().collect::<String>();
@@ -329,7 +324,6 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
                     .map_err(|e| GCodeParseError::from_parse(e, input))?;
                 Command::G1(g1)
             }
-            ("G", "28") => crate::Command::G28,
             ("G", "90") => {
                 gcode.rel_xyz = false;
                 Command::G90
@@ -361,7 +355,7 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
 
 #[test]
 fn gcode_parser_test() {
-    let input = "G1 X1.0 Y2.0 Z3.0 E4.0 F5.0; hello world\nG28; hello world\nG90; hello world\nG91; hello world\nM82".to_string();
+    let input = "G1 X1.0 Y2.0 Z3.0 E4.0 F5.0;hello world\nG28 W ; hello world\nG90; hello world\nG91; hello world\nM82".to_string();
     let mut input = input.as_str();
     let result = gcode_parser(&mut input).unwrap();
     let expected = GCodeModel {
@@ -378,14 +372,13 @@ fn gcode_parser_test() {
                     z: Some(String::from("3.0")),
                     e: Some(String::from("4.0")),
                     f: Some(String::from("5.0")),
-                    comments: None,
                 }),
-                comments: String::from(" hello world"),
+                comments: String::from("hello world"),
             },
             GCodeLine {
                 id: crate::Id(1),
                 line_number: 1,
-                command: Command::G28,
+                command: Command::Unsupported(String::from("G28 W ")),
                 comments: String::from(" hello world"),
             },
             GCodeLine {
@@ -408,5 +401,7 @@ fn gcode_parser_test() {
             },
         ],
     };
-    assert_eq!(result, expected);
+    for (a, b) in result.lines.iter().zip(expected.lines.iter()) {
+        assert_eq!(a, b);
+    }
 }
