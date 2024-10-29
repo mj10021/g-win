@@ -20,20 +20,19 @@ impl Emit for Command {
 
 impl Emit for GCodeLine {
     fn emit(&self, debug: bool) -> String {
-        self.command.emit(debug) + self.comments.as_str()
+        let comments = if self.comments.is_empty() {
+            String::from("")
+        } else {
+            format!(";{}", self.comments)
+        };
+        self.command.emit(debug) + comments.as_str()
     }
 }
 
 impl Emit for G1 {
     fn emit(&self, _debug: bool) -> String {
         let mut out = String::from("G1 ");
-        let G1 {
-            x,
-            y,
-            z,
-            e,
-            f,
-        } = self;
+        let G1 { x, y, z, e, f } = self;
         let params = vec![('X', x), ('Y', y), ('Z', z), ('E', e), ('F', f)];
         for (letter, param) in params {
             if let Some(param) = param {
@@ -46,6 +45,10 @@ impl Emit for G1 {
 
 impl Emit for GCodeModel {
     fn emit(&self, debug: bool) -> String {
-        self.lines.iter().map(|line| line.emit(debug)).collect::<Vec<_>>().join("\n")
+        self.lines
+            .iter()
+            .map(|line| line.emit(debug))
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 }

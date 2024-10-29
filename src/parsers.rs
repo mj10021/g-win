@@ -3,7 +3,7 @@ use winnow::{
     ascii::multispace1,
     combinator::{eof, rest, separated_pair},
     error::{ErrMode, InputError},
-    token::{one_of, take, take_till, take_until, take_while},
+    token::{one_of, take, take_till, take_while},
     PResult, Parser,
 };
 
@@ -63,30 +63,6 @@ fn test_parse_lines() {
     for (input, expected) in tests.iter_mut() {
         let result = parse_lines(input).unwrap();
         assert_eq!(result, *expected);
-    }
-}
-// strips a comment from a line, returning a tuple of two strings separated by a ';'
-// NOTE: input needs to be cleared of whitespace before parsing comments
-fn parse_comments<'a>(input: &mut &'a str) -> PResult<(&'a str, &'a str)> {
-    if !input.contains(';') {
-        return Ok((input, ""));
-    }
-    let (start, _separator) = (take_until(0.., ';'), take(1_usize)).parse_next(input)?;
-    Ok((start, input))
-}
-
-#[test]
-fn test_parse_comments() {
-    let tests = [
-        ("hello;world", ("hello", "world")),
-        ("hello;world;more", ("hello", "world;more")),
-        ("hello", ("hello", "")),
-        ("hello;", ("hello", "")),
-        (";", ("", "")),
-    ];
-    for (mut input, expected) in tests.iter() {
-        let (start, rest) = parse_comments(&mut input).unwrap();
-        assert_eq!((start, rest), *expected);
     }
 }
 
@@ -291,9 +267,16 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
         .map_err(|e| GCodeParseError::from_parse(e, input))?;
     // split a file into lines
     for (i, line) in lines.into_iter().enumerate() {
-
         // split off comments before parsing
-        let (line, comments) = line.split_once(';').unwrap_or((line, ""));
+        let (line, comments) = {
+            if line.starts_with(";") {
+                ("", line.split_at(1).1)
+            } else if let Some((line, comments)) = line.split_once(';') {
+                (line, comments)
+            } else {
+                (line, "")
+            }
+        };
 
         // store a copy of the original line for unsupported commands
         let string_copy = String::from(line);
@@ -315,12 +298,12 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
             });
             continue;
         }
-        let (command, num, mut rest) = parsed_word.unwrap();
+        let (command, num, rest) = parsed_word.unwrap();
         // process rest of command based on first word
         let command = match (command, num) {
             ("G", "1") => {
                 let g1 = g1_parameter_parse
-                    .parse(&mut rest)
+                    .parse(rest)
                     .map_err(|e| GCodeParseError::from_parse(e, input))?;
                 Command::G1(g1)
             }
@@ -355,7 +338,7 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
 
 #[test]
 fn gcode_parser_test() {
-    let input = "G1 X1.0 Y2.0 Z3.0 E4.0 F5.0;hello world\nG28 W ; hello world\nG90; hello world\nG91; hello world\nM82".to_string();
+    let input = "G1 X1.0 Y2.0 Z3.0 E4.0 F5.0;hello world\nG28 W ; hello world\nG90; hello world\nG91; hello world\nM82\n; asdf".to_string();
     let mut input = input.as_str();
     let result = gcode_parser(&mut input).unwrap();
     let expected = GCodeModel {
@@ -398,6 +381,12 @@ fn gcode_parser_test() {
                 line_number: 4,
                 command: Command::M82,
                 comments: String::from(""),
+            },
+            GCodeLine {
+                id: crate::Id(5),
+                line_number: 5,
+                command: Command::Unsupported(String::from("")),
+                comments: String::from(" asdf"),
             },
         ],
     };
