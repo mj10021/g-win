@@ -139,46 +139,34 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
         let line = line.split_whitespace().collect::<String>();
         let mut line = line.as_str();
 
-        // split off first word from command
-        let parsed_word = parse_word.parse_next(&mut line);
-
-        if parsed_word.is_err() {
-            let id = gcode.id_counter.get();
-            gcode.lines.push(GCodeLine {
-                id,
-                command: Command::Raw(string_copy.clone()),
-                comments: String::from(comments),
-            });
-            continue;
-        }
-        let (command, num, rest) = parsed_word.unwrap();
-        // process rest of command based on first word
-        let command = match (command, num) {
-            ("G", "1") => {
+        // generate id and check first word of command
+        let id = gcode.id_counter.get();
+        let command = match parse_word.parse_next(&mut line) {
+            // process rest of command based on first word
+            Ok(("G", "1", rest)) => {
                 let g1 = g1_parameter_parse
                     .parse(rest)
                     .map_err(|e| GCodeParseError::from_parse(e, input))?;
                 Command::G1(g1)
             }
-            ("G", "90") => {
+            Ok(("G", "90", _)) => {
                 gcode.rel_xyz = false;
                 Command::G90
             }
-            ("G", "91") => {
+            Ok(("G", "91", _)) => {
                 gcode.rel_xyz = true;
                 Command::G91
             }
-            ("M", "82") => {
+            Ok(("M", "82", _)) => {
                 gcode.rel_e = false;
                 Command::M82
             }
-            ("M", "83") => {
+            Ok(("M", "83", _)) => {
                 gcode.rel_e = true;
                 Command::M83
             }
             _ => Command::Raw(string_copy),
         };
-        let id = gcode.id_counter.get();
         gcode.lines.push(GCodeLine {
             id,
             command,
