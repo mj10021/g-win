@@ -34,7 +34,7 @@ struct GCodeLine {
     comments: String,
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct GCodeModel {
     lines: Vec<GCodeLine>, // keep track of line order
     rel_xyz: bool,
@@ -68,7 +68,7 @@ impl GCodeModel {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct Counter {
     count: u32,
 }

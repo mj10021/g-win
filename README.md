@@ -84,22 +84,17 @@ cargo build
 
 use  g_win::GCodeModel;
 
-  
-
-fn  main() {
-	let  gcode = "
-		G21 ; Set units to millimeters
-		G90 ; Absolute positioning
-		M107 ; Fan Off
-		G28 ; Home
-		G1 Z15.0 F9000 ; Move Z Axis up
-		MCustomCommand ; This is a custom command
-		";
-		
-	let  gcode: GCodeModel = gcode.parse().expect("failed to parse");
-	println!("{:?}", gcode);
-
-}
+let  gcode = "
+	G21 ; Set units to millimeters
+	G90 ; Absolute positioning
+	M107 ; Fan Off
+	G28 ; Home
+	G1 Z15.0 F9000 ; Move Z Axis up
+	MCustomCommand ; This is a custom command
+	";
+	
+let  gcode: GCodeModel = gcode.parse().expect("failed to parse");
+println!("{:?}", gcode);
 
 ```
 
