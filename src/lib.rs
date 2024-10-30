@@ -1,7 +1,7 @@
 pub mod emit;
 pub mod file;
 pub mod parsers;
-use std::io::Write;
+use std::{io::Write, path::Path};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 struct Counter {
@@ -98,11 +98,11 @@ fn from_str_gcode_test() {
 }
 
 impl GCodeModel {
-    pub fn from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn from_file(path: &std::path::Path) -> Result<Self, Box<dyn std::error::Error>> {
         let gcode = file::open_gcode_file(path)?;
         Ok(gcode.parse()?)
     }
-    pub fn write_to_file(&self, path: &str) -> Result<(), std::io::Error> {
+    pub fn write_to_file(&self, path: &Path) -> Result<(), std::io::Error> {
         use emit::Emit;
         use std::fs::File;
         let out = self.emit(false);
@@ -127,17 +127,17 @@ fn write_to_file_test() {
     let gcode = "G1 X1 Y2 Z3 E4 F5\nG1 X1 Y2 Z3 E4 F5\nG1 X1 Y2 Z3 E4 F5\n";
     let gcode_model: GCodeModel = gcode.parse().unwrap();
     let path = test_gcode_path().join("output").join("test_write.gcode");
-    gcode_model.write_to_file(path.as_os_str().to_str().unwrap()).unwrap();
-    let gcode = GCodeModel::from_file(path.as_os_str().to_str().unwrap()).unwrap();
+    gcode_model.write_to_file(&path).unwrap();
+    let gcode = GCodeModel::from_file(&path).unwrap();
     assert_eq!(gcode.lines.len(), 3);
 }
 
 #[test]
 fn integration_test() {
-    // FIXME: this always passes 
+    // FIXME: this always passes
     let input = test_gcode_path().join("test.gcode");
     let output = test_gcode_path().join("output").join("test_output.gcode");
-    let gcode = GCodeModel::from_file(input.as_os_str().to_str().unwrap()).unwrap();
+    let gcode = GCodeModel::from_file(&input).unwrap();
     assert_eq!(gcode.rel_xyz, false);
     assert_eq!(gcode.rel_e, true);
     use crate::emit::Emit;
@@ -145,7 +145,7 @@ fn integration_test() {
     use std::io::Write;
     let mut f = File::create(output.clone()).unwrap();
     f.write_all(gcode.emit(false).as_bytes()).unwrap();
-    let gcode2 = GCodeModel::from_file(output.as_os_str().to_str().unwrap()).unwrap();
+    let gcode2 = GCodeModel::from_file(&output).unwrap();
     let (lines_a, lines_b) = (gcode.lines, gcode2.lines);
     // take a diff of both files
     let set_a = lines_a.iter().collect::<std::collections::HashSet<_>>();

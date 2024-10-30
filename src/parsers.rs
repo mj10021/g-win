@@ -248,7 +248,14 @@ fn gcode_parse_error_test() {
     let test = "0";
     let error = multispace1.parse(test).unwrap_err();
     let error = GCodeParseError::from_parse(error, test);
-    assert_eq!(GCodeParseError { message: "".to_string(), span: 0..1, input: "0".to_string() }, error);
+    assert_eq!(
+        GCodeParseError {
+            message: "".to_string(),
+            span: 0..1,
+            input: "0".to_string()
+        },
+        error
+    );
 }
 
 impl std::fmt::Display for GCodeParseError {
