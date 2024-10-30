@@ -63,15 +63,17 @@ fn g1_parameter_parse(input: &mut &str) -> PResult<G1> {
     Ok(out)
 }
 
+/// Custom error type for integrating winnow errors 
+/// with the main application
 #[derive(Debug, PartialEq)]
 pub struct GCodeParseError {
-    message: String,
+    pub message: String,
     // Byte spans are tracked, rather than line and column.
     // This makes it easier to operate on programmatically
     // and doesn't limit us to one definition for column count
     // which can depend on the output medium and application.
-    span: std::ops::Range<usize>,
-    input: String,
+    pub span: std::ops::Range<usize>,
+    pub input: String,
 }
 
 impl GCodeParseError {

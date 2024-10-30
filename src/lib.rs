@@ -8,17 +8,22 @@ mod tests;
 
 use std::{io::Write, path::Path};
 
+/// Struct to store G1 params as optional strings
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-struct G1 {
-    x: Option<String>,
-    y: Option<String>,
-    z: Option<String>,
-    e: Option<String>,
-    f: Option<String>,
+pub struct G1 {
+    pub x: Option<String>,
+    pub y: Option<String>,
+    pub z: Option<String>,
+    pub e: Option<String>,
+    pub f: Option<String>,
 }
 
+/// Enum to represent all possible gcode commands that we would
+/// like to handle, leaving any unknown commands as raw strings.
+/// Specific structs to store information for each command can
+/// be added as needed.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-enum Command {
+pub enum Command {
     G1(G1),
     G90,
     G91,
@@ -27,19 +32,26 @@ enum Command {
     Raw(String),
 }
 
+/// Struct to store a single line of gcode, with an id, command,
+/// and comments
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-struct GCodeLine {
-    id: Id,
-    command: Command,
-    comments: String,
+pub struct GCodeLine {
+    pub id: Id,
+    pub command: Command,
+    pub comments: String,
 }
 
+/// Struct to store all information for a .gcode file,
+/// specifically calling out relative vs absolute positioning
+/// and extrusion and with a counter to generate line ids
+/// 
+//~ NOTE: this struct is generated through the FromStr trait
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct GCodeModel {
-    lines: Vec<GCodeLine>, // keep track of line order
-    rel_xyz: bool,
-    rel_e: bool,
-    id_counter: Counter,
+    pub lines: Vec<GCodeLine>, // keep track of line order
+    pub rel_xyz: bool,
+    pub rel_e: bool,
+    pub id_counter: Counter,
 }
 
 impl std::str::FromStr for GCodeModel {
@@ -69,7 +81,7 @@ impl GCodeModel {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-struct Counter {
+pub struct Counter {
     count: u32,
 }
 
@@ -82,5 +94,5 @@ impl Counter {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
-struct Id(u32);
+pub struct Id(u32);
 
