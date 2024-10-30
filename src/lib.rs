@@ -1,21 +1,24 @@
-pub mod emit;
-pub mod file;
-pub mod parsers;
+// include readme in doctests
+#![doc = include_str!("../README.md")]
+
+mod emit;
+mod file;
+mod parsers;
 mod tests;
 
 use std::{io::Write, path::Path};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct G1 {
-    pub x: Option<String>,
-    pub y: Option<String>,
-    pub z: Option<String>,
-    pub e: Option<String>,
-    pub f: Option<String>,
+struct G1 {
+    x: Option<String>,
+    y: Option<String>,
+    z: Option<String>,
+    e: Option<String>,
+    f: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Command {
+enum Command {
     G1(G1),
     G90,
     G91,
@@ -25,17 +28,17 @@ pub enum Command {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct GCodeLine {
-    pub id: Id,
-    pub command: Command,
+struct GCodeLine {
+    id: Id,
+    command: Command,
     comments: String,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct GCodeModel {
-    pub lines: Vec<GCodeLine>, // keep track of line order
-    pub rel_xyz: bool,
-    pub rel_e: bool,
+    lines: Vec<GCodeLine>, // keep track of line order
+    rel_xyz: bool,
+    rel_e: bool,
     id_counter: Counter,
 }
 
@@ -79,5 +82,5 @@ impl Counter {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
-pub struct Id(u32);
+struct Id(u32);
 
