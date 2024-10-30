@@ -14,27 +14,6 @@ fn parse_line<'a>(input: &mut &'a str) -> PResult<&'a str> {
     Ok(line)
 }
 
-#[test]
-fn parse_line_test() {
-    let mut tests = [
-        ("hello\n", "hello"),
-        ("hello", "hello"),
-        ("hello\nworld", "hello"),
-        ("hello\nworld\n", "hello"),
-        ("hello\nworld\nmore", "hello"),
-        ("hello\nworld\nmore\n", "hello"),
-        ("hello\nworld\nmore\n\n", "hello"),
-        ("\n", ""),
-        ("\r", ""),
-        ("", ""),
-    ];
-    for (input, expected) in tests.iter_mut() {
-        let debug = String::from(*input);
-        let result = parse_line(input).expect(format!("failed to parse: {}", debug).as_str());
-        assert_eq!(result, *expected);
-    }
-}
-
 fn parse_lines<'a>(input: &mut &'a str) -> PResult<Vec<&'a str>> {
     let mut out = Vec::new();
     loop {
@@ -49,23 +28,6 @@ fn parse_lines<'a>(input: &mut &'a str) -> PResult<Vec<&'a str>> {
     Ok(out)
 }
 
-#[test]
-fn parse_lines_test() {
-    let mut tests = [
-        ("hello\nworld\nmore\n", vec!["hello", "world", "more"]),
-        ("hello\nworld\nmore", vec!["hello", "world", "more"]),
-        ("hello\nworld\nmore\n\n", vec!["hello", "world", "more"]),
-        ("hello", vec!["hello"]),
-        ("hello\n", vec!["hello"]),
-        ("\n", vec![""]),
-        ("", vec![]),
-    ];
-    for (input, expected) in tests.iter_mut() {
-        let result = parse_lines(input).unwrap();
-        assert_eq!(result, *expected);
-    }
-}
-
 fn parse_word<'a>(input: &mut &'a str) -> PResult<(&'a str, &'a str, &'a str)> {
     (
         take(1_usize),
@@ -75,37 +37,9 @@ fn parse_word<'a>(input: &mut &'a str) -> PResult<(&'a str, &'a str, &'a str)> {
         .parse_next(input)
 }
 
-#[test]
-fn parse_word_test() {
-    let tests = [
-        ("G1", ("G", "1", "")),
-        ("M1234", ("M", "1234", "")),
-        ("G28W", ("G", "28", "W")),
-        (
-            "G1 X1.0 Y2.0 Z3.0 E4.0 F5.0",
-            ("G", "1", " X1.0 Y2.0 Z3.0 E4.0 F5.0"),
-        ),
-    ];
-    for (mut input, expected) in tests.iter() {
-        assert_eq!(parse_word(&mut input).unwrap(), *expected);
-    }
-}
-
 // Helper function to check if a character is part of a number
 fn is_number_char(c: char) -> bool {
     c.is_numeric() || c == '.' || c == '-' || c == '+'
-}
-
-#[test]
-fn number_chars() {
-    let tests = ["1.0000231", "-1.02030", "1.2+-0.0001", "-0.0000011"];
-    for test in tests {
-        for c in test.chars() {
-            if !is_number_char(c) {
-                panic!("invalid charachter found: {}", c);
-            }
-        }
-    }
 }
 
 fn g1_parameter_parse(input: &mut &str) -> PResult<G1> {
@@ -127,86 +61,6 @@ fn g1_parameter_parse(input: &mut &str) -> PResult<G1> {
         }
     }
     Ok(out)
-}
-
-#[test]
-fn g1_parameter_parse_test() {
-    let mut tests = [
-        (
-            "X1.0Y2.0Z3.0E4.0F5.0",
-            G1 {
-                x: Some(String::from("1.0")),
-                y: Some(String::from("2.0")),
-                z: Some(String::from("3.0")),
-                e: Some(String::from("4.0")),
-                f: Some(String::from("5.0")),
-            },
-        ),
-        (
-            "X1.0Y2.0Z3.0E4.0",
-            G1 {
-                x: Some(String::from("1.0")),
-                y: Some(String::from("2.0")),
-                z: Some(String::from("3.0")),
-                e: Some(String::from("4.0")),
-                f: None,
-            },
-        ),
-        (
-            "X1.0Y2.0Z3.0",
-            G1 {
-                x: Some(String::from("1.0")),
-                y: Some(String::from("2.0")),
-                z: Some(String::from("3.0")),
-                e: None,
-                f: None,
-            },
-        ),
-        (
-            "X1.0Y2.0",
-            G1 {
-                x: Some(String::from("1.0")),
-                y: Some(String::from("2.0")),
-                z: None,
-                e: None,
-                f: None,
-            },
-        ),
-        (
-            "X1.0",
-            G1 {
-                x: Some(String::from("1.0")),
-                y: None,
-                z: None,
-                e: None,
-                f: None,
-            },
-        ),
-        (
-            "Y-2.0",
-            G1 {
-                x: None,
-                y: Some(String::from("-2.0")),
-                z: None,
-                e: None,
-                f: None,
-            },
-        ),
-        (
-            "Z0.000000001",
-            G1 {
-                x: None,
-                y: None,
-                z: Some(String::from("0.000000001")),
-                e: None,
-                f: None,
-            },
-        ),
-    ];
-    for (mut input, expected) in tests.iter_mut() {
-        let result = g1_parameter_parse(&mut input).unwrap();
-        assert_eq!(result, *expected);
-    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -241,21 +95,6 @@ impl GCodeParseError {
             input,
         }
     }
-}
-
-#[test]
-fn gcode_parse_error_test() {
-    let test = "0";
-    let error = multispace1.parse(test).unwrap_err();
-    let error = GCodeParseError::from_parse(error, test);
-    assert_eq!(
-        GCodeParseError {
-            message: "".to_string(),
-            span: 0..1,
-            input: "0".to_string()
-        },
-        error
-    );
 }
 
 impl std::fmt::Display for GCodeParseError {
@@ -400,4 +239,164 @@ fn gcode_parser_test() {
     for (a, b) in result.lines.iter().zip(expected.lines.iter()) {
         assert_eq!(a, b);
     }
+}
+
+#[test]
+fn parse_line_test() {
+    let mut tests = [
+        ("hello\n", "hello"),
+        ("hello", "hello"),
+        ("hello\nworld", "hello"),
+        ("hello\nworld\n", "hello"),
+        ("hello\nworld\nmore", "hello"),
+        ("hello\nworld\nmore\n", "hello"),
+        ("hello\nworld\nmore\n\n", "hello"),
+        ("\n", ""),
+        ("\r", ""),
+        ("", ""),
+    ];
+    for (input, expected) in tests.iter_mut() {
+        let debug = String::from(*input);
+        let result = parse_line(input).expect(format!("failed to parse: {}", debug).as_str());
+        assert_eq!(result, *expected);
+    }
+}
+
+
+#[test]
+fn parse_lines_test() {
+    let mut tests = [
+        ("hello\nworld\nmore\n", vec!["hello", "world", "more"]),
+        ("hello\nworld\nmore", vec!["hello", "world", "more"]),
+        ("hello\nworld\nmore\n\n", vec!["hello", "world", "more"]),
+        ("hello", vec!["hello"]),
+        ("hello\n", vec!["hello"]),
+        ("\n", vec![""]),
+        ("", vec![]),
+    ];
+    for (input, expected) in tests.iter_mut() {
+        let result = parse_lines(input).unwrap();
+        assert_eq!(result, *expected);
+    }
+}
+#[test]
+fn parse_word_test() {
+    let tests = [
+        ("G1", ("G", "1", "")),
+        ("M1234", ("M", "1234", "")),
+        ("G28W", ("G", "28", "W")),
+        (
+            "G1 X1.0 Y2.0 Z3.0 E4.0 F5.0",
+            ("G", "1", " X1.0 Y2.0 Z3.0 E4.0 F5.0"),
+        ),
+    ];
+    for (mut input, expected) in tests.iter() {
+        assert_eq!(parse_word(&mut input).unwrap(), *expected);
+    }
+}
+#[test]
+fn number_chars() {
+    let tests = ["1.0000231", "-1.02030", "1.2+-0.0001", "-0.0000011"];
+    for test in tests {
+        for c in test.chars() {
+            if !is_number_char(c) {
+                panic!("invalid charachter found: {}", c);
+            }
+        }
+    }
+}
+
+
+#[test]
+fn g1_parameter_parse_test() {
+    let mut tests = [
+        (
+            "X1.0Y2.0Z3.0E4.0F5.0",
+            G1 {
+                x: Some(String::from("1.0")),
+                y: Some(String::from("2.0")),
+                z: Some(String::from("3.0")),
+                e: Some(String::from("4.0")),
+                f: Some(String::from("5.0")),
+            },
+        ),
+        (
+            "X1.0Y2.0Z3.0E4.0",
+            G1 {
+                x: Some(String::from("1.0")),
+                y: Some(String::from("2.0")),
+                z: Some(String::from("3.0")),
+                e: Some(String::from("4.0")),
+                f: None,
+            },
+        ),
+        (
+            "X1.0Y2.0Z3.0",
+            G1 {
+                x: Some(String::from("1.0")),
+                y: Some(String::from("2.0")),
+                z: Some(String::from("3.0")),
+                e: None,
+                f: None,
+            },
+        ),
+        (
+            "X1.0Y2.0",
+            G1 {
+                x: Some(String::from("1.0")),
+                y: Some(String::from("2.0")),
+                z: None,
+                e: None,
+                f: None,
+            },
+        ),
+        (
+            "X1.0",
+            G1 {
+                x: Some(String::from("1.0")),
+                y: None,
+                z: None,
+                e: None,
+                f: None,
+            },
+        ),
+        (
+            "Y-2.0",
+            G1 {
+                x: None,
+                y: Some(String::from("-2.0")),
+                z: None,
+                e: None,
+                f: None,
+            },
+        ),
+        (
+            "Z0.000000001",
+            G1 {
+                x: None,
+                y: None,
+                z: Some(String::from("0.000000001")),
+                e: None,
+                f: None,
+            },
+        ),
+    ];
+    for (mut input, expected) in tests.iter_mut() {
+        let result = g1_parameter_parse(&mut input).unwrap();
+        assert_eq!(result, *expected);
+    }
+}
+#[test]
+fn gcode_parse_error_test() {
+    let test = "0";
+    let error = multispace1.parse(test).unwrap_err();
+    let error = GCodeParseError::from_parse(error, test);
+    assert_eq!(
+        GCodeParseError {
+            message: "".to_string(),
+            span: 0..1,
+            input: "0".to_string()
+        },
+        error
+    );
 }
