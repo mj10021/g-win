@@ -54,7 +54,6 @@ pub enum Command {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct GCodeLine {
     pub id: Id,
-    pub line_number: usize,
     pub command: Command,
     comments: String,
 }

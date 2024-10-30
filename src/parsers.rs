@@ -281,7 +281,7 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
         .parse(input)
         .map_err(|e| GCodeParseError::from_parse(e, input))?;
     // split a file into lines
-    for (i, line) in lines.into_iter().enumerate() {
+    for line in lines {
         // split off comments before parsing
         let (line, comments) = {
             if line.starts_with(";") {
@@ -307,7 +307,6 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
             let id = gcode.id_counter.get();
             gcode.lines.push(GCodeLine {
                 id,
-                line_number: i,
                 command: Command::Raw(string_copy.clone()),
                 comments: String::from(comments),
             });
@@ -343,7 +342,6 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
         let id = gcode.id_counter.get();
         gcode.lines.push(GCodeLine {
             id,
-            line_number: i,
             command,
             comments: String::from(comments),
         });
@@ -363,7 +361,6 @@ fn gcode_parser_test() {
         lines: vec![
             GCodeLine {
                 id: crate::Id(0),
-                line_number: 0,
                 command: Command::G1(G1 {
                     x: Some(String::from("1.0")),
                     y: Some(String::from("2.0")),
@@ -375,31 +372,26 @@ fn gcode_parser_test() {
             },
             GCodeLine {
                 id: crate::Id(1),
-                line_number: 1,
                 command: Command::Raw(String::from("G28 W ")),
                 comments: String::from(" hello world"),
             },
             GCodeLine {
                 id: crate::Id(2),
-                line_number: 2,
                 command: Command::G90,
                 comments: String::from(" hello world"),
             },
             GCodeLine {
                 id: crate::Id(3),
-                line_number: 3,
                 command: Command::G91,
                 comments: String::from(" hello world"),
             },
             GCodeLine {
                 id: crate::Id(4),
-                line_number: 4,
                 command: Command::M82,
                 comments: String::from(""),
             },
             GCodeLine {
                 id: crate::Id(5),
-                line_number: 5,
                 command: Command::Raw(String::from("")),
                 comments: String::from(" asdf"),
             },
