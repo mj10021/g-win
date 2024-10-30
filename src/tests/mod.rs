@@ -1,6 +1,5 @@
-#[cfg(test)]
+#![cfg(test)]
 use crate::GCodeModel;
-#[cfg(test)]
 fn test_gcode_path() -> std::path::PathBuf {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
     std::path::Path::new(&manifest_dir)
@@ -39,3 +38,20 @@ fn integration_test() {
     let _diff = set_a.symmetric_difference(&set_b);
     // assert!(diff.clone().into_iter().count() == 0);
 }
+
+#[test]
+fn from_str_gcode_test() {
+    let gcode = "G1 X1 Y2 Z3 E4 F5\nG1 X1 Y2 Z3 E4 F5\nG1 X1 Y2 Z3 E4 F5\n";
+    let gcode_model: GCodeModel = gcode.parse().unwrap();
+    assert_eq!(gcode_model.lines.len(), 3);
+}
+
+#[test]
+fn test_counter() {
+    use crate::{Counter, Id};
+    let mut c = Counter::default();
+    assert_eq!(c.get(), Id(0));
+    assert_eq!(c.get(), Id(1));
+    assert_eq!(c.get(), Id(2));
+}
+

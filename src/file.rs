@@ -1,4 +1,4 @@
-use std::path::Path;
+use crate::Path;
 
 // check that path is to a file with the correct extension and read to String
 pub fn open_gcode_file(path: &Path) -> Result<String, Box<dyn std::error::Error>> {
