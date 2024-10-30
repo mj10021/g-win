@@ -3,7 +3,7 @@ name = "g-win"
 version = "0.1.0"
 edition = "2021"
 authors = ["James Dietz <jamesthespeedy@gmail.com>"]
-license-file = "LICENSE"
+license = "MIT OR Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/mj10021/g-win/"
 
