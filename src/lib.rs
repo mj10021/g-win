@@ -123,6 +123,16 @@ fn test_gcode_path() -> std::path::PathBuf {
 }
 
 #[test]
+fn write_to_file_test() {
+    let gcode = "G1 X1 Y2 Z3 E4 F5\nG1 X1 Y2 Z3 E4 F5\nG1 X1 Y2 Z3 E4 F5\n";
+    let gcode_model: GCodeModel = gcode.parse().unwrap();
+    let path = test_gcode_path().join("output").join("test_write.gcode");
+    gcode_model.write_to_file(path.as_os_str().to_str().unwrap()).unwrap();
+    let gcode = GCodeModel::from_file(path.as_os_str().to_str().unwrap()).unwrap();
+    assert_eq!(gcode.lines.len(), 3);
+}
+
+#[test]
 fn integration_test() {
     // FIXME: this always passes 
     let input = test_gcode_path().join("test.gcode");

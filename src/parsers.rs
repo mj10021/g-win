@@ -50,7 +50,7 @@ fn parse_lines<'a>(input: &mut &'a str) -> PResult<Vec<&'a str>> {
 }
 
 #[test]
-fn test_parse_lines() {
+fn parse_lines_test() {
     let mut tests = [
         ("hello\nworld\nmore\n", vec!["hello", "world", "more"]),
         ("hello\nworld\nmore", vec!["hello", "world", "more"]),
@@ -76,7 +76,7 @@ fn parse_word<'a>(input: &mut &'a str) -> PResult<(&'a str, &'a str, &'a str)> {
 }
 
 #[test]
-fn test_parse_word() {
+fn parse_word_test() {
     let tests = [
         ("G1", ("G", "1", "")),
         ("M1234", ("M", "1234", "")),
@@ -209,7 +209,7 @@ fn g1_parameter_parse_test() {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct GCodeParseError {
     message: String,
     // Byte spans are tracked, rather than line and column.
@@ -241,6 +241,14 @@ impl GCodeParseError {
             input,
         }
     }
+}
+
+#[test]
+fn gcode_parse_error_test() {
+    let test = "0";
+    let error = multispace1.parse(test).unwrap_err();
+    let error = GCodeParseError::from_parse(error, test);
+    assert_eq!(GCodeParseError { message: "".to_string(), span: 0..1, input: "0".to_string() }, error);
 }
 
 impl std::fmt::Display for GCodeParseError {
