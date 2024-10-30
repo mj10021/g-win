@@ -5,7 +5,10 @@ edition = "2021"
 authors = ["James Dietz <jamesthespeedy@gmail.com>"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
+description = "A winnow parser for .gcode files"
 repository = "https://github.com/mj10021/g-win/"
+keywords = ["gcode", "parser", "g-code", "3d", "printing"]
+categories = ["parser-implementations"]
 
 [dependencies]
 annotate-snippets = "0.11.4"
