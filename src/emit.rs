@@ -47,8 +47,7 @@ impl Emit for GCodeModel {
     fn emit(&self, debug: bool) -> String {
         self.lines
             .iter()
-            .map(|line| line.emit(debug))
-            .collect::<Vec<_>>()
-            .join("\n")
+            .map(|line| line.emit(debug) + "\n")
+            .collect::<String>()
     }
 }
