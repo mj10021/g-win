@@ -48,6 +48,6 @@ impl Emit for GCodeModel {
         self.lines
             .iter()
             .map(|line| line.emit(debug) + "\n")
-            .collect::<String>()
+            .collect()
     }
 }
