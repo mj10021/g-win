@@ -1,4 +1,4 @@
-// include readme in doctests
+// include readme in docs
 #![doc = include_str!("../README.md")]
 
 mod emit;
