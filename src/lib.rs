@@ -6,6 +6,9 @@ mod file;
 mod parsers;
 mod tests;
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 use std::{io::Write, path::Path};
 
 /// Struct to store G1 params as optional strings
