@@ -48,10 +48,9 @@ fn from_str_gcode_test() {
 
 #[test]
 fn test_counter() {
-    use crate::{Id, Counter};
+    use crate::{Counter, Id};
     let mut c = Counter::default();
     assert_eq!(c.get(), Id(0));
     assert_eq!(c.get(), Id(1));
     assert_eq!(c.get(), Id(2));
 }
-

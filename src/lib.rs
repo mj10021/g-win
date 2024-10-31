@@ -9,6 +9,7 @@ mod tests;
 use std::{io::Write, path::Path};
 
 /// Struct to store G1 params as optional strings
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct G1 {
     pub x: Option<String>,
@@ -22,6 +23,7 @@ pub struct G1 {
 /// like to handle, leaving any unknown commands as raw strings.
 /// Specific structs to store information for each command can
 /// be added as needed.
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Command {
     G1(G1),
@@ -34,6 +36,7 @@ pub enum Command {
 
 /// Struct to store a single line of gcode, with an id, command,
 /// and comments
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct GCodeLine {
     pub id: Id,
@@ -44,8 +47,9 @@ pub struct GCodeLine {
 /// Struct to store all information for a .gcode file,
 /// specifically calling out relative vs absolute positioning
 /// and extrusion and with a counter to generate line ids
-/// 
+///
 //~ NOTE: this struct is generated through the FromStr trait
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct GCodeModel {
     pub lines: Vec<GCodeLine>, // keep track of line order
@@ -79,7 +83,7 @@ impl GCodeModel {
         Ok(())
     }
 }
-
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Counter {
     count: u32,
@@ -92,7 +96,6 @@ impl Counter {
         Id(out)
     }
 }
-
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub struct Id(u32);
-

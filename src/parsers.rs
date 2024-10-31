@@ -17,7 +17,9 @@ fn parse_line<'a>(input: &mut &'a str) -> PResult<&'a str> {
 fn parse_lines<'a>(input: &mut &'a str) -> PResult<Vec<&'a str>> {
     let mut out = Vec::new();
     loop {
-        if input.is_empty() { break; }
+        if input.is_empty() {
+            break;
+        }
         out.push(parse_line.parse_next(input)?);
     }
     Ok(out)
@@ -58,7 +60,7 @@ fn g1_parameter_parse(input: &mut &str) -> PResult<G1> {
     Ok(out)
 }
 
-/// Custom error type for integrating winnow errors 
+/// Custom error type for integrating winnow errors
 /// with the main application
 #[derive(Debug, PartialEq)]
 pub struct GCodeParseError {
@@ -239,7 +241,6 @@ fn parse_line_test() {
     }
 }
 
-
 #[test]
 fn parse_lines_test() {
     let mut tests = [
@@ -282,7 +283,6 @@ fn number_chars() {
         }
     }
 }
-
 
 #[test]
 fn g1_parameter_parse_test() {
