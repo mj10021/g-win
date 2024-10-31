@@ -99,3 +99,5 @@ impl Counter {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub struct Id(u32);
+
+struct A;
