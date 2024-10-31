@@ -12,4 +12,4 @@ categories = ["parser-implementations"]
 
 [dependencies]
 annotate-snippets = "0.11.4"
-winnow = "0.6.20"
+winnow = { version = "0.6.20", features = ["simd"] }
