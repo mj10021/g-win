@@ -1,8 +1,8 @@
 use crate::{Command, GCodeLine, GCodeModel, G1};
 use winnow::{
     ascii::multispace1,
-    combinator::{eof, rest, separated_pair},
-    error::{ErrMode, InputError},
+    combinator::{rest, separated_pair},
+    error::InputError,
     token::{one_of, take, take_till, take_while},
     PResult, Parser,
 };
@@ -17,12 +17,7 @@ fn parse_line<'a>(input: &mut &'a str) -> PResult<&'a str> {
 fn parse_lines<'a>(input: &mut &'a str) -> PResult<Vec<&'a str>> {
     let mut out = Vec::new();
     loop {
-        if eof::<&str, ErrMode<InputError<&str>>>
-            .parse_next(input)
-            .is_ok()
-        {
-            break;
-        }
+        if input.is_empty() { break; }
         out.push(parse_line.parse_next(input)?);
     }
     Ok(out)
@@ -124,15 +119,7 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
     // split a file into lines
     for line in lines {
         // split off comments before parsing
-        let (line, comments) = {
-            if line.starts_with(";") {
-                ("", line.split_at(1).1)
-            } else if let Some((line, comments)) = line.split_once(';') {
-                (line, comments)
-            } else {
-                (line, "")
-            }
-        };
+        let (line, comments) = line.split_once(';').unwrap_or((line, ""));
 
         // store a copy of the original line for unsupported commands
         let string_copy = String::from(line);
