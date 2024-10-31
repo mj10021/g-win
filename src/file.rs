@@ -11,3 +11,9 @@ pub fn open_gcode_file(path: &Path) -> Result<String, Box<dyn std::error::Error>
     }
     Err(Box::from("unable to parse file extension"))
 }
+
+#[test]
+fn open_gcode_file_test() {
+    let path = Path::new("src/tests/test.gcode");
+    let _ = open_gcode_file(&path).unwrap();
+}
