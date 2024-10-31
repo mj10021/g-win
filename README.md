@@ -18,19 +18,19 @@
 
   
 
-- [Features](#features)
+- [Design](#design)
 
 - [Installation](#installation)
 
 - [Usage](#usage)
 
-- [Contributing](#contributing)
-
 - [License](#license)
+
+- [Contribution](#contribution)
 
   
 
-## Design Goals
+## Design
 
   
 
@@ -105,26 +105,6 @@ println!("{:?}", gcode);
 `g-win` stores unrecognized or custom commands as `Command::Raw(String)`, preserving their original content.
 
 
-## Contributing
-
-  
-
-Contributions are welcome! Please submit a pull request or open an issue for suggestions and improvements.
-
-  
-
-1. Fork the repository.
-
-2. Create a new branch: `git checkout -b feature/your-feature-name`.
-
-3. Commit your changes: `git commit 'Add some feature'`.
-
-4. Push to the branch: `git push origin feature/your-feature-name`.
-
-5. Open a pull request.
-
-  
-
 ## License
 
 Licensed under either of
@@ -137,6 +117,18 @@ Licensed under either of
 at your option.
 
 ## Contribution
+
+Contributions are welcome! Please submit a pull request or open an issue for suggestions and improvements.
+
+1. Fork the repository.
+
+2. Create a new branch: `git checkout -b feature/your-feature-name`.
+
+3. Commit your changes: `git commit 'Add some feature'`.
+
+4. Push to the branch: `git push origin feature/your-feature-name`.
+
+5. Open a pull request.
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
