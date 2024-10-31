@@ -7,6 +7,7 @@ use winnow::{
     PResult, Parser,
 };
 
+/// parse a line until '\n' or '\r' and then clear all following whitespace
 fn parse_line<'a>(input: &mut &'a str) -> PResult<&'a str> {
     // this must always consume at least one character
     let line = take_till(0.., |c| c == '\n' || c == '\r').parse_next(input)?;
@@ -14,6 +15,7 @@ fn parse_line<'a>(input: &mut &'a str) -> PResult<&'a str> {
     Ok(line)
 }
 
+/// repeat the parse_line fn until the input is empty and collect to Vec
 fn parse_lines<'a>(input: &mut &'a str) -> PResult<Vec<&'a str>> {
     let mut out = Vec::new();
     loop {
@@ -25,6 +27,9 @@ fn parse_lines<'a>(input: &mut &'a str) -> PResult<Vec<&'a str>> {
     Ok(out)
 }
 
+/// parse the first word of a line by taking the first char
+/// and then parsing all following numeric characters, not accepting
+/// floats, negative numbers, or scientific notation
 fn parse_word<'a>(input: &mut &'a str) -> PResult<(&'a str, &'a str, &'a str)> {
     (
         take(1_usize),
@@ -34,11 +39,12 @@ fn parse_word<'a>(input: &mut &'a str) -> PResult<(&'a str, &'a str, &'a str)> {
         .parse_next(input)
 }
 
-// Helper function to check if a character is part of a number
+/// Helper function to check if a character is part of a number
 fn is_number_char(c: char) -> bool {
     c.is_numeric() || c == '.' || c == '-' || c == '+'
 }
 
+/// parses g1 params once the first word ("G1") has been parsed
 fn g1_parameter_parse(input: &mut &str) -> PResult<G1> {
     let mut out = G1::default();
     while let Ok((c, val)) = separated_pair(
@@ -113,6 +119,7 @@ impl std::fmt::Display for GCodeParseError {
 
 impl std::error::Error for GCodeParseError {}
 
+/// Outermost parser for gcode files
 pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
     let mut gcode = GCodeModel::default();
     let lines = parse_lines
