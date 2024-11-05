@@ -1,7 +1,7 @@
 // include readme in docs
 #![doc = include_str!("../README.md")]
 
-mod emit;
+pub mod emit;
 mod file;
 mod parsers;
 mod tests;
