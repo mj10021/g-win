@@ -1,6 +1,6 @@
 [package]
 name = "g-win"
-version = "0.1.2"
+version = "0.1.4"
 edition = "2021"
 authors = ["James Dietz <jamesthespeedy@gmail.com>"]
 license = "MIT OR Apache-2.0"
