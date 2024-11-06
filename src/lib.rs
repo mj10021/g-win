@@ -102,3 +102,9 @@ impl Counter {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
 pub struct Id(u32);
+
+impl Id {
+    pub fn get(&self) -> u32 {
+        self.0
+    }
+}
