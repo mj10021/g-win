@@ -45,12 +45,3 @@ fn from_str_gcode_test() {
     let gcode_model: GCodeModel = gcode.parse().unwrap();
     assert_eq!(gcode_model.lines.len(), 3);
 }
-
-#[test]
-fn test_counter() {
-    use crate::{Counter, Id};
-    let mut c = Counter::default();
-    assert_eq!(c.get(), Id(0));
-    assert_eq!(c.get(), Id(1));
-    assert_eq!(c.get(), Id(2));
-}

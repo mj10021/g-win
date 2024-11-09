@@ -2,6 +2,7 @@
 #![doc = include_str!("../README.md")]
 
 pub mod emit;
+pub mod analyzer;
 mod file;
 mod parsers;
 mod tests;
@@ -42,7 +43,6 @@ pub enum Command {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct GCodeLine {
-    pub id: Id,
     pub command: Command,
     pub comments: String,
 }
@@ -58,7 +58,6 @@ pub struct GCodeModel {
     pub lines: Vec<GCodeLine>, // keep track of line order
     pub rel_xyz: bool,
     pub rel_e: bool,
-    pub id_counter: Counter,
 }
 
 impl std::str::FromStr for GCodeModel {
@@ -84,27 +83,5 @@ impl GCodeModel {
         f.write_all(out.as_bytes())?;
         println!("save successful");
         Ok(())
-    }
-}
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Counter {
-    count: u32,
-}
-
-impl Counter {
-    fn get(&mut self) -> Id {
-        let out = self.count;
-        self.count += 1;
-        Id(out)
-    }
-}
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, Default)]
-pub struct Id(u32);
-
-impl Id {
-    pub fn get(&self) -> u32 {
-        self.0
     }
 }

@@ -137,8 +137,7 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
         let line = line.split_whitespace().collect::<String>();
         let mut line = line.as_str();
 
-        // generate id and check first word of command
-        let id = gcode.id_counter.get();
+        // check first word of command
         let command = match parse_word.parse_next(&mut line) {
             // process rest of command based on first word
             Ok(("G", "1", rest)) => {
@@ -166,7 +165,6 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
             _ => Command::Raw(string_copy),
         };
         gcode.lines.push(GCodeLine {
-            id,
             command,
             comments: String::from(comments),
         });
@@ -180,12 +178,10 @@ fn gcode_parser_test() {
     let mut input = input.as_str();
     let result = gcode_parser(&mut input).unwrap();
     let expected = GCodeModel {
-        id_counter: crate::Counter { count: 5 },
         rel_xyz: true,
         rel_e: false,
         lines: vec![
             GCodeLine {
-                id: crate::Id(0),
                 command: Command::G1(G1 {
                     x: Some(String::from("1.0")),
                     y: Some(String::from("2.0")),
@@ -196,27 +192,22 @@ fn gcode_parser_test() {
                 comments: String::from("hello world"),
             },
             GCodeLine {
-                id: crate::Id(1),
                 command: Command::Raw(String::from("G28 W ")),
                 comments: String::from(" hello world"),
             },
             GCodeLine {
-                id: crate::Id(2),
                 command: Command::G90,
                 comments: String::from(" hello world"),
             },
             GCodeLine {
-                id: crate::Id(3),
                 command: Command::G91,
                 comments: String::from(" hello world"),
             },
             GCodeLine {
-                id: crate::Id(4),
                 command: Command::M82,
                 comments: String::from(""),
             },
             GCodeLine {
-                id: crate::Id(5),
                 command: Command::Raw(String::from("")),
                 comments: String::from(" asdf"),
             },
