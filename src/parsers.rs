@@ -1,4 +1,4 @@
-use crate::{Command, GCodeLine, GCodeModel, G1};
+use crate::{Command, GCodeLine, GCodeModel};
 use winnow::{
     ascii::multispace1,
     combinator::{rest, separated_pair},
@@ -45,21 +45,21 @@ fn is_number_char(c: char) -> bool {
 }
 
 /// parses g1 params once the first word ("G1") has been parsed
-fn g1_parameter_parse(input: &mut &str) -> PResult<G1> {
-    let mut out = G1::default();
+fn g1_parameter_parse<'a>(input: &mut &'a str) -> PResult<[&'a str;5]> {
+    let mut out = ["";5];
     while let Ok((c, val)) = separated_pair(
         one_of::<_, _, InputError<_>>(['X', 'Y', 'Z', 'E', 'F']),
         winnow::combinator::empty,
-        take_while(1.., is_number_char).parse_to(),
+        take_while(1.., is_number_char),
     )
     .parse_next(input)
     {
         match c {
-            'X' => out.x = Some(val),
-            'Y' => out.y = Some(val),
-            'Z' => out.z = Some(val),
-            'E' => out.e = Some(val),
-            'F' => out.f = Some(val),
+            'X' => out[0] = val,
+            'Y' => out[1] = val,
+            'Z' => out[2] = val,
+            'E' => out[3] = val,
+            'F' => out[4] = val,
             _ => {}
         }
     }
@@ -144,7 +144,13 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
                 let g1 = g1_parameter_parse
                     .parse(rest)
                     .map_err(|e| GCodeParseError::from_parse(e, input))?;
-                Command::G1(g1)
+                Command::G1{
+                    x: g1[0].to_string(),
+                    y: g1[1].to_string(),
+                    z: g1[2].to_string(),
+                    e: g1[3].to_string(),
+                    f: g1[4].to_string(),
+                }
             }
             Ok(("G", "90", _)) => {
                 gcode.rel_xyz = false;
@@ -182,13 +188,13 @@ fn gcode_parser_test() {
         rel_e: false,
         lines: vec![
             GCodeLine {
-                command: Command::G1(G1 {
-                    x: Some(String::from("1.0")),
-                    y: Some(String::from("2.0")),
-                    z: Some(String::from("3.0")),
-                    e: Some(String::from("4.0")),
-                    f: Some(String::from("5.0")),
-                }),
+                command: Command::G1 {
+                    x: String::from("1.0"),
+                    y: String::from("2.0"),
+                    z: String::from("3.0"),
+                    e: String::from("4.0"),
+                    f: String::from("5.0"),
+                },
                 comments: String::from("hello world"),
             },
             GCodeLine {
@@ -287,77 +293,84 @@ fn g1_parameter_parse_test() {
     let mut tests = [
         (
             "X1.0Y2.0Z3.0E4.0F5.0",
-            G1 {
-                x: Some(String::from("1.0")),
-                y: Some(String::from("2.0")),
-                z: Some(String::from("3.0")),
-                e: Some(String::from("4.0")),
-                f: Some(String::from("5.0")),
+            Command::G1 {
+                x: String::from("1.0"),
+                y: String::from("2.0"),
+                z: String::from("3.0"),
+                e: String::from("4.0"),
+                f: String::from("5.0"),
             },
         ),
         (
             "X1.0Y2.0Z3.0E4.0",
-            G1 {
-                x: Some(String::from("1.0")),
-                y: Some(String::from("2.0")),
-                z: Some(String::from("3.0")),
-                e: Some(String::from("4.0")),
-                f: None,
+            Command::G1 {
+                x: String::from("1.0"),
+                y: String::from("2.0"),
+                z: String::from("3.0"),
+                e: String::from("4.0"),
+                f: String::new(),
             },
         ),
         (
             "X1.0Y2.0Z3.0",
-            G1 {
-                x: Some(String::from("1.0")),
-                y: Some(String::from("2.0")),
-                z: Some(String::from("3.0")),
-                e: None,
-                f: None,
+            Command::G1 {
+                x: String::from("1.0"),
+                y: String::from("2.0"),
+                z: String::from("3.0"),
+                e: String::new(),
+                f: String::new(),
             },
         ),
         (
             "X1.0Y2.0",
-            G1 {
-                x: Some(String::from("1.0")),
-                y: Some(String::from("2.0")),
-                z: None,
-                e: None,
-                f: None,
+            Command::G1 {
+                x: String::from("1.0"),
+                y: String::from("2.0"),
+                z: String::new(),
+                e: String::new(),
+                f: String::new(),
             },
         ),
         (
             "X1.0",
-            G1 {
-                x: Some(String::from("1.0")),
-                y: None,
-                z: None,
-                e: None,
-                f: None,
+            Command::G1 {
+                x: String::from("1.0"),
+                y: String::new(),
+                z: String::new(),
+                e: String::new(),
+                f: String::new(),
             },
         ),
         (
             "Y-2.0",
-            G1 {
-                x: None,
-                y: Some(String::from("-2.0")),
-                z: None,
-                e: None,
-                f: None,
+            Command::G1 {
+                x: String::new(),
+                y: String::from("-2.0"),
+                z: String::new(),
+                e: String::new(),
+                f: String::new(),
             },
         ),
         (
             "Z0.000000001",
-            G1 {
-                x: None,
-                y: None,
-                z: Some(String::from("0.000000001")),
-                e: None,
-                f: None,
+            Command::G1 {
+                x: String::new(),
+                y: String::new(),
+                z: String::from("0.000000001"),
+                e: String::new(),
+                f: String::new(),
             },
         ),
     ];
     for (mut input, expected) in tests.iter_mut() {
         let result = g1_parameter_parse(&mut input).unwrap();
+        let result = Command::G1 {
+            x: String::from(result[0]),
+            y: String::from(result[1]),
+            z: String::from(result[2]),
+            e: String::from(result[3]),
+            f: String::from(result[4]),
+        };
         assert_eq!(result, *expected);
     }
 }

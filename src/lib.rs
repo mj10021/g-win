@@ -4,6 +4,7 @@
 pub mod emit;
 pub mod analyzer;
 mod file;
+mod tokens;
 mod parsers;
 mod tests;
 
@@ -12,16 +13,6 @@ use serde::{Deserialize, Serialize};
 
 use std::{io::Write, path::Path};
 
-/// Struct to store G1 params as optional strings
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
-pub struct G1 {
-    pub x: Option<String>,
-    pub y: Option<String>,
-    pub z: Option<String>,
-    pub e: Option<String>,
-    pub f: Option<String>,
-}
 
 /// Enum to represent all possible gcode commands that we would
 /// like to handle, leaving any unknown commands as raw strings.
@@ -30,7 +21,13 @@ pub struct G1 {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Command {
-    G1(G1),
+    G1{
+        x: String,
+        y: String,
+        z: String,
+        e: String,
+        f: String,
+    },
     G90,
     G91,
     M82,
@@ -76,9 +73,8 @@ impl GCodeModel {
         Ok(file::open_gcode_file(path)?.parse()?)
     }
     pub fn write_to_file(&self, path: &Path) -> Result<(), std::io::Error> {
-        use emit::Emit;
         use std::fs::File;
-        let out = self.emit(false);
+        let out = self.to_string();
         let mut f = File::create(path)?;
         f.write_all(out.as_bytes())?;
         println!("save successful");

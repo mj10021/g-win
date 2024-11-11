@@ -25,11 +25,10 @@ fn integration_test() {
     let gcode = GCodeModel::from_file(&input).unwrap();
     assert_eq!(gcode.rel_xyz, false);
     assert_eq!(gcode.rel_e, true);
-    use crate::emit::Emit;
     use std::fs::File;
     use std::io::Write;
     let mut f = File::create(output.clone()).unwrap();
-    f.write_all(gcode.emit(false).as_bytes()).unwrap();
+    f.write_all(gcode.to_string().as_bytes()).unwrap();
     let gcode2 = GCodeModel::from_file(&output).unwrap();
     let (lines_a, lines_b) = (gcode.lines, gcode2.lines);
     // take a diff of both files
