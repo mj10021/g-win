@@ -3,8 +3,6 @@
 
 pub mod emit;
 pub mod analyzer;
-mod file;
-mod tokens;
 mod parsers;
 mod tests;
 
@@ -12,6 +10,25 @@ mod tests;
 use serde::{Deserialize, Serialize};
 
 use std::{io::Write, path::Path};
+
+// check that path is to a file with the correct extension and read to String
+fn open_gcode_file(path: &Path) -> Result<String, Box<dyn std::error::Error>> {
+    // check path extension
+    if let Some(extension) = path.extension().and_then(|ext| ext.to_str()) {
+        match extension {
+            "gcode" => return Ok(String::from_utf8(std::fs::read(path)?)?),
+            _ => return Err(Box::from(format!("invalid file extension: {}", extension))),
+        }
+    }
+    Err(Box::from("unable to parse file extension"))
+}
+
+#[test]
+fn open_gcode_file_test() {
+    let path = Path::new("src/tests/test.gcode");
+    let _ = open_gcode_file(&path).unwrap();
+}
+
 
 
 /// Enum to represent all possible gcode commands that we would
@@ -70,7 +87,7 @@ impl std::str::FromStr for GCodeModel {
 
 impl GCodeModel {
     pub fn from_file(path: &Path) -> Result<Self, Box<dyn std::error::Error>> {
-        Ok(file::open_gcode_file(path)?.parse()?)
+        Ok(open_gcode_file(path)?.parse()?)
     }
     pub fn write_to_file(&self, path: &Path) -> Result<(), std::io::Error> {
         use std::fs::File;
