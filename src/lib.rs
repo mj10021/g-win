@@ -1,8 +1,8 @@
 // include readme in docs
 #![doc = include_str!("../README.md")]
 
-pub mod emit;
 pub mod analyzer;
+pub mod emit;
 mod parsers;
 mod tests;
 
@@ -29,16 +29,14 @@ fn open_gcode_file_test() {
     let _ = open_gcode_file(&path).unwrap();
 }
 
-
-
-/// Enum to represent all possible gcode commands that we would
+/// Represent all possible gcode commands that we would
 /// like to handle, leaving any unknown commands as raw strings.
 /// Specific structs to store information for each command can
 /// be added as needed.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Command {
-    G1{
+    G1 {
         x: String,
         y: String,
         z: String,
@@ -52,7 +50,7 @@ pub enum Command {
     Raw(String),
 }
 
-/// Struct to store a single line of gcode, with an id, command,
+/// Store a single line of gcode, with an id, command,
 /// and comments
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -61,7 +59,7 @@ pub struct GCodeLine {
     pub comments: String,
 }
 
-/// Struct to store all information for a .gcode file,
+/// Store all information for a .gcode file,
 /// specifically calling out relative vs absolute positioning
 /// and extrusion and with a counter to generate line ids
 ///

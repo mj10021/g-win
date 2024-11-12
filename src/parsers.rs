@@ -45,8 +45,8 @@ fn is_number_char(c: char) -> bool {
 }
 
 /// parses g1 params once the first word ("G1") has been parsed
-fn g1_parameter_parse<'a>(input: &mut &'a str) -> PResult<[&'a str;5]> {
-    let mut out = ["";5];
+fn g1_parameter_parse<'a>(input: &mut &'a str) -> PResult<[&'a str; 5]> {
+    let mut out = [""; 5];
     while let Ok((c, val)) = separated_pair(
         one_of::<_, _, InputError<_>>(['X', 'Y', 'Z', 'E', 'F']),
         winnow::combinator::empty,
@@ -144,7 +144,7 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
                 let g1 = g1_parameter_parse
                     .parse(rest)
                     .map_err(|e| GCodeParseError::from_parse(e, input))?;
-                Command::G1{
+                Command::G1 {
                     x: g1[0].to_string(),
                     y: g1[1].to_string(),
                     z: g1[2].to_string(),

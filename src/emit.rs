@@ -1,48 +1,49 @@
-use crate::{Command, GCodeLine, GCodeModel};
+use crate::*;
+use std::fmt::{self, Display};
 
-/// Trait objects that can be emitted to valid gcode, with an optional debug line appended
-pub trait Emit {
-    fn emit(&self, debug: bool) -> String;
-}
-
-impl ToString for Command {
-    fn to_string(&self) -> String {
+impl fmt::Display for Command {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Command::G1{x, y, z, e, f} => {
+            Command::G1 {
+                x,
+                y,
+                z,
+                e,
+                f: feed,
+            } => {
                 let mut out = String::from("G1 ");
-                    let params = vec![('X', x), ('Y', y), ('Z', z), ('E', e), ('F', f)];
-                    for (letter, param) in params {
-                        if !param.is_empty() {
-                            out += format!("{}{} ", letter, param).as_str();
-                        }
+                let params = vec![('X', x), ('Y', y), ('Z', z), ('E', e), ('F', feed)];
+                for (letter, param) in params {
+                    if !param.is_empty() {
+                        out += format!("{}{} ", letter, param).as_str();
                     }
-                out
+                }
+                write!(f, "{}", out.trim())
             }
-            Command::G90 => "G90".to_string(),
-            Command::G91 => "G91".to_string(),
-            Command::M82 => "M82".to_string(),
-            Command::M83 => "M83".to_string(),
-            Command::Raw(s) => s.clone(),
+            Command::G90 => write!(f, "G90"),
+            Command::G91 => write!(f, "G91"),
+            Command::M82 => write!(f, "M82"),
+            Command::M83 => write!(f, "M83"),
+            Command::Raw(s) => write!(f, "{}", s),
         }
     }
 }
 
-impl ToString for GCodeLine {
-    fn to_string(&self) -> String {
-        let comments = if self.comments.is_empty() {
-            String::from("")
-        } else {
-            format!(";{}", self.comments)
-        };
-        self.command.to_string() + comments.as_str()
+impl Display for GCodeLine {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.command)?;
+        if !self.comments.is_empty() {
+            write!(f, ";{}", self.comments)?;
+        }
+        Ok(())
     }
 }
 
-impl ToString for GCodeModel {
-    fn to_string(&self) -> String {
-        self.lines
-            .iter()
-            .map(|line| line.to_string() + "\n")
-            .collect()
+impl Display for GCodeModel {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for line in &self.lines {
+            writeln!(f, "{}\n", line)?;
+        }
+        Ok(())
     }
 }
