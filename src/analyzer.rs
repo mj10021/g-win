@@ -3,6 +3,13 @@ use std::ops::Range;
 
 use crate::{Command, GCodeModel};
 
+fn calc_slope(a: [f32; 5], b: [f32; 5]) -> f32 {
+    let dx = b[0] - a[0];
+    let dy = b[1] - a[1];
+    dy / dx
+}
+
+#[derive(Clone, Copy)]
 struct Cursor<'a> {
     parent: &'a GCodeModel,
     idx: usize,
@@ -24,6 +31,20 @@ impl<'a> From<&'a GCodeModel> for Cursor<'a> {
 }
 
 impl<'a> Cursor<'a> {
+    fn child_at(&self, idx: usize) -> Cursor<'a> {
+        let mut child = Cursor {
+            parent: self.parent,
+            idx: 0,
+            state: [0.0; 5],
+            prev: None,
+            curr_command: &self.parent.lines[0].command,
+        };
+        for _ in 0..idx {
+            let _ = child.next();
+        }
+        child
+
+    }
     fn reset(&mut self) {
         self.idx = 0;
         self.update();
@@ -96,44 +117,47 @@ impl<'a> Cursor<'a> {
         }
         start..end
     }
+    fn at_first_extrusion(&self) -> bool{
+        let mut temp_cursor = *self;
+        while temp_cursor.prev().is_ok() {
+            if temp_cursor.is_extrusion(temp_cursor.state) {
+                return false;
+            }
+        }
+        true
+
+    }
     fn is_purge_line(&mut self, lines: Range<usize>) -> bool {
         // determining what is a purge line based on 
         //     1) is it the first extrusion of the print
         //     2) is it outside of the print area
         //     3) can you fit the shape to a line
         let Range { start, .. } = lines;
-        self.idx = start;
-        self.update();
-        let mut init = self.state;
-        while self.idx > 0 {
-            if let Ok(_) = self.prev() {
-                if self.is_extrusion(init) {
-                    return false;
-                }
-            }
-            init = self.state;
+        let mut cur = self.child_at(start);
+        if !cur.at_first_extrusion() {
+            return false;
         }
-        self.idx = start;
-        self.update();
-        let mut init = self.state;
+        let mut init = cur.state;
         let mut shape_positions = Vec::new();
-        while self.next().is_ok() {
-            if self.is_extrusion(init) {
-                shape_positions.push(self.state);
-                if self.state[0] > 2.0 && self.state[1] > 2.0 {
+        // load all the shape positions into a vec while
+        // checking if any extrusions are inside the main print area
+        while cur.next().is_ok() {
+            if cur.is_extrusion(init) {
+                shape_positions.push(cur.state);
+                if cur.state[0] > 2.0 && cur.state[1] > 2.0 {
                     return false;
                 }
             }
-            init = self.state;
+            init = cur.state;
         }
+        // now if there are 3 or more points in the shape,
+        // check if they are in a line by making sure the
+        // slope (abs) is the same for every move
+
         if shape_positions.len() > 2 {
-            let dx = shape_positions[1][0] - shape_positions[0][0];
-            let dy = shape_positions[1][1] - shape_positions[0][1];
-            let mut slope = (dy / dx).abs();
+            let mut slope = calc_slope(shape_positions[0], shape_positions[1]).abs();
             for i in 2..shape_positions.len() {
-                let dx = shape_positions[i][0] - shape_positions[i - 1][0];
-                let dy = shape_positions[i][1] - shape_positions[i - 1][1];
-                let slope_i = (dy / dx).abs();
+                let slope_i = calc_slope(shape_positions[i - 1], shape_positions[i]).abs();
                 if (slope - slope_i).abs() > f32::EPSILON {
                     return false;
                 }
