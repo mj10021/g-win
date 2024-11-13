@@ -87,7 +87,7 @@ impl<'a> Cursor<'a> {
         let mut init = self.state;
         let start = self.idx;
         let mut end = self.idx;
-        while let Ok(_) = self.next() {
+        while self.next().is_ok() {
             if bool_mod == self.is_extrusion(init) {
                 break;
             }
@@ -117,7 +117,7 @@ impl<'a> Cursor<'a> {
         self.update();
         let mut init = self.state;
         let mut shape_positions = Vec::new();
-        while let Ok(_) = self.next() {
+        while self.next().is_ok() {
             if self.is_extrusion(init) {
                 shape_positions.push(self.state);
                 if self.state[0] > 2.0 && self.state[1] > 2.0 {
@@ -147,7 +147,7 @@ impl<'a> Cursor<'a> {
     fn shapes(&mut self) -> Vec<Range<usize>> {
         let mut shapes = Vec::new();
         self.reset();
-        while let Ok(_) = self.next() {
+        while self.next().is_ok() {
             let range = self.next_shape(true);
             shapes.push(range);
         }
