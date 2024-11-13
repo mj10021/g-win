@@ -62,18 +62,6 @@ impl<'a> Cursor<'a> {
         self.update();
         Ok(self.curr_command)
     }
-    fn print_start(&mut self) -> usize {
-        while let Ok(command) = self.next() {
-            if let Command::G1 { e, .. } = command {
-                if let Ok(e) = e.parse::<f32>() {
-                    if e > 0.0 {
-                        break;
-                    }
-                }
-            }
-        }
-        self.idx
-    }
     fn is_extrusion(&self, prev: [f32; 5]) -> bool {
         let [dx, dy, dz, _de, _df] = self
             .state
@@ -164,5 +152,21 @@ impl<'a> Cursor<'a> {
             shapes.push(range);
         }
         shapes
+    }
+
+    fn print_start(&mut self) -> usize {
+        let mut shapes = self.shapes();
+        shapes.reverse();
+        if let Some(first) = shapes.pop() {
+            if !self.is_purge_line(first.clone()) {
+                return first.start;
+            }
+            else {
+                if let Some(second) = shapes.pop() {
+                    return second.start;
+                }
+            }
+        }
+        0
     }
 }
