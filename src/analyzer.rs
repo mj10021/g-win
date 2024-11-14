@@ -10,7 +10,7 @@ fn calc_slope(a: [f32; 5], b: [f32; 5]) -> f32 {
 }
 
 #[derive(Clone, Copy)]
-struct Cursor<'a> {
+pub struct Cursor<'a> {
     parent: &'a GCodeModel,
     idx: usize,
     state: [f32; 5],
@@ -31,24 +31,12 @@ impl<'a> From<&'a GCodeModel> for Cursor<'a> {
 }
 
 impl<'a> Cursor<'a> {
-    fn child_at(&self, idx: usize) -> Cursor<'a> {
-        let mut child = Cursor {
-            parent: self.parent,
-            idx: 0,
-            state: [0.0; 5],
-            prev: None,
-            curr_command: &self.parent.lines[0].command,
-        };
-        for _ in 0..idx {
-            let _ = child.next();
-        }
-        child
 
-    }
     fn reset(&mut self) {
         self.idx = 0;
         self.update();
     }
+
     fn update(&mut self) {
         let curr = self.state;
         self.prev = Some(curr);
@@ -63,7 +51,8 @@ impl<'a> Cursor<'a> {
             ];
         }
     }
-    fn next(&mut self) -> Result<&'a Command, &'static str> {
+
+     fn next(&mut self) -> Result<&'a Command, &'static str> {
         // attempt to move the cursor to the next line
         // and return the line number if successful
         if self.idx >= self.parent.lines.len() {
@@ -73,6 +62,7 @@ impl<'a> Cursor<'a> {
         self.update();
         Ok(self.curr_command)
     }
+
     fn prev(&mut self) -> Result<&'a Command, &'static str> {
         // attempt to move the cursor to the previous line
         // and return the line number if successful
@@ -83,6 +73,22 @@ impl<'a> Cursor<'a> {
         self.update();
         Ok(self.curr_command)
     }
+
+    fn child_at(&self, idx: usize) -> Cursor<'a> {
+        let mut child = Cursor {
+            parent: self.parent,
+            idx: 0,
+            state: [0.0; 5],
+            prev: None,
+            curr_command: &self.parent.lines[0].command,
+        };
+        while child.idx < idx {
+            let _ = child.next();
+        }
+        child
+
+    }
+ 
     fn is_extrusion(&self, prev: [f32; 5]) -> bool {
         let [dx, dy, dz, _de, _df] = self
             .state
@@ -99,6 +105,7 @@ impl<'a> Cursor<'a> {
         }
         false
     }
+
     fn next_shape(&mut self, shape_or_change: bool) -> Range<usize> {
         // keep moving the cursor until a non exstrusion G1 is found
         // shape_or_change should be true for shape detevtion and false for change detection
@@ -117,6 +124,7 @@ impl<'a> Cursor<'a> {
         }
         start..end
     }
+
     fn at_first_extrusion(&self) -> bool{
         let mut temp_cursor = *self;
         while temp_cursor.prev().is_ok() {
@@ -127,6 +135,7 @@ impl<'a> Cursor<'a> {
         true
 
     }
+
     fn is_purge_line(&mut self, lines: Range<usize>) -> bool {
         // determining what is a purge line based on 
         //     1) is it the first extrusion of the print
@@ -168,6 +177,7 @@ impl<'a> Cursor<'a> {
         true
 
     }
+
     fn shapes(&mut self) -> Vec<Range<usize>> {
         let mut shapes = Vec::new();
         self.reset();
@@ -178,19 +188,81 @@ impl<'a> Cursor<'a> {
         shapes
     }
 
-    fn print_start(&mut self) -> usize {
+    pub fn pre_print(&mut self) -> Range<usize> {
         let mut shapes = self.shapes();
         shapes.reverse();
         if let Some(first) = shapes.pop() {
             if !self.is_purge_line(first.clone()) {
-                return first.start;
+                return 0..first.start;
             }
             else {
                 if let Some(second) = shapes.pop() {
-                    return second.start;
+                    return 0..second.start;
                 }
             }
         }
-        0
+        0..0
+    }
+
+    pub fn post_print(&mut self) -> Range<usize> {
+        let mut shapes = self.shapes();
+        if let Some(Range {end,..}) = shapes.pop() {
+            return end..self.parent.lines.len();
+        }
+        self.parent.lines.len()..self.parent.lines.len()
+    }
+    fn nonplanar_extrusion(&self, prev: [f32; 5]) -> bool {
+        let [dx, dy, dz, _de, _df] = self
+            .state
+            .iter()
+            .zip(prev.iter())
+            .map(|(a, b)| a - b)
+            .collect::<Vec<f32>>()
+            .try_into()
+            .unwrap();
+        if let Command::G1 { e, .. } = self.curr_command {
+            if let Ok(e) = e.parse::<f32>() {
+                return e > 0.0 && dz.abs() > f32::EPSILON;
+            }
+        }
+        false
+    }
+    pub fn is_planar(&mut self) -> bool {
+        let mut init = self.state;
+        while self.next().is_ok() {
+            if self.nonplanar_extrusion(init) {
+                return false;
+            }
+            init = self.state;
+        }
+        true
+    }
+
+    pub fn layer_height(&mut self) -> (u32, u32) {
+        let mut init = self.state;
+        let mut heights = Vec::new();
+        if !self.is_planar() {
+            return (0, 0);
+        }
+        while self.next().is_ok() {
+            if self.is_extrusion(init) {
+                heights.push(self.state[2]);
+            }
+            init = self.state;
+        }
+        heights.dedup();
+        let mut heights = heights.iter().map(|x| (x * 1000.0) as u32).collect::<Vec<u32>>();
+        heights.sort();
+        let first = heights[0];
+        let second = heights[1];
+        let first_layer_height = second - first;
+        let second_layer_height = heights[2] - second;
+        for i in 3..heights.len() {
+            let layer_height = heights[i] - heights[i - 1];
+            if layer_height != second_layer_height {
+                return (first_layer_height, 0);
+            }
+        }
+        (first_layer_height, second_layer_height)
     }
 }

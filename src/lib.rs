@@ -8,6 +8,7 @@ mod tests;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+use winnow::stream::Range;
 
 use std::{io::Write, path::Path};
 
@@ -59,6 +60,28 @@ pub struct GCodeLine {
     pub comments: String,
 }
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct PrintMetadata {
+    relative_e: bool,
+    relative_xyz: bool,
+    preprint: std::ops::Range<usize>,
+    postprint: std::ops::Range<usize>,
+    /// micrometers (first layer, rest of layers((0, 0) if nonplanar))
+    layer_height: (u32, u32),
+}
+
+impl PrintMetadata {
+    fn build(&mut self, gcode: &GCodeModel) {
+        let mut cursor = analyzer::Cursor::from(gcode);
+        self.preprint = cursor.pre_print();
+        self.postprint = cursor.post_print();
+        self.relative_e = gcode.rel_e;
+        self.relative_xyz = gcode.rel_xyz;
+        self.layer_height = cursor.layer_height();
+
+    }
+}
 /// Store all information for a .gcode file,
 /// specifically calling out relative vs absolute positioning
 /// and extrusion and with a counter to generate line ids
@@ -70,6 +93,7 @@ pub struct GCodeModel {
     pub lines: Vec<GCodeLine>, // keep track of line order
     pub rel_xyz: bool,
     pub rel_e: bool,
+    pub metadata: PrintMetadata,
 }
 
 impl std::str::FromStr for GCodeModel {

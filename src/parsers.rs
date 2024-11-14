@@ -218,6 +218,7 @@ fn gcode_parser_test() {
                 comments: String::from(" asdf"),
             },
         ],
+        metadata: Default::default(),
     };
     for (a, b) in result.lines.iter().zip(expected.lines.iter()) {
         assert_eq!(a, b);
