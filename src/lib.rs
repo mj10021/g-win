@@ -71,14 +71,16 @@ pub struct PrintMetadata {
     layer_height: (u32, u32),
 }
 
-impl PrintMetadata {
-    fn build(&mut self, gcode: &GCodeModel) {
+impl From<&GCodeModel> for PrintMetadata {
+    fn from(gcode: &GCodeModel) -> Self {
         let mut cursor = analyzer::Cursor::from(gcode);
-        self.preprint = cursor.pre_print();
-        self.postprint = cursor.post_print();
-        self.relative_e = gcode.rel_e;
-        self.relative_xyz = gcode.rel_xyz;
-        self.layer_height = cursor.layer_height();
+        let mut out = PrintMetadata::default();
+        out.preprint = cursor.pre_print();
+        out.postprint = cursor.post_print();
+        out.relative_e = gcode.rel_e;
+        out.relative_xyz = gcode.rel_xyz;
+        out.layer_height = cursor.layer_height();
+        out
 
     }
 }
@@ -101,7 +103,11 @@ impl std::str::FromStr for GCodeModel {
     fn from_str(mut s: &str) -> Result<Self, Self::Err> {
         let gcode = parsers::gcode_parser(&mut s);
         match gcode {
-            Ok(gcode) => Ok(gcode),
+            Ok(mut gcode) => {
+                let metadata = PrintMetadata::from(&gcode);
+                gcode.metadata = metadata;
+                Ok(gcode)
+            }
             Err(e) => Err(e),
         }
     }

@@ -40,7 +40,10 @@ impl<'a> Cursor<'a> {
     fn update(&mut self) {
         let curr = self.state;
         self.prev = Some(curr);
-        self.curr_command = &self.parent.lines[self.idx].command;
+        self.curr_command = match self.parent.lines.get(self.idx) {
+            Some(line) => &line.command,
+            None => panic!("asdf"),
+        };
         if let Command::G1 { x, y, z, e, f } = self.curr_command {
             self.state = [
                 x.parse().unwrap_or(curr[0]),
@@ -55,7 +58,7 @@ impl<'a> Cursor<'a> {
      fn next(&mut self) -> Result<&'a Command, &'static str> {
         // attempt to move the cursor to the next line
         // and return the line number if successful
-        if self.idx >= self.parent.lines.len() {
+        if self.idx > self.parent.lines.len() - 2 {
             return Err("End of file");
         }
         self.idx += 1;
@@ -253,10 +256,22 @@ impl<'a> Cursor<'a> {
         heights.dedup();
         let mut heights = heights.iter().map(|x| (x * 1000.0) as u32).collect::<Vec<u32>>();
         heights.sort();
+        if heights.len() < 1 {
+            return (0, 0);
+        }
+        if heights.len() == 1 {
+            return (heights[0], 0);
+        }
         let first = heights[0];
         let second = heights[1];
         let first_layer_height = second - first;
+        if heights.len() == 2 {
+            return (first_layer_height, 0);
+        }
         let second_layer_height = heights[2] - second;
+        if heights.len() == 3 {
+            return (first_layer_height, second_layer_height);
+        }
         for i in 3..heights.len() {
             let layer_height = heights[i] - heights[i - 1];
             if layer_height != second_layer_height {
