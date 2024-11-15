@@ -215,7 +215,7 @@ impl<'a> Cursor<'a> {
         self.parent.lines.len()..self.parent.lines.len()
     }
     fn nonplanar_extrusion(&self, prev: [f32; 5]) -> bool {
-        let [dx, dy, dz, _de, _df] = self
+        let [_dx, _dy, dz, _de, _df] = self
             .state
             .iter()
             .zip(prev.iter())

@@ -8,7 +8,6 @@ mod tests;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use winnow::stream::Range;
 
 use std::{io::Write, path::Path};
 
