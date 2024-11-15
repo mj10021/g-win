@@ -23,8 +23,8 @@ fn integration_test() {
     let input = test_gcode_path().join("test.gcode");
     let output = test_gcode_path().join("output").join("test_output.gcode");
     let gcode = GCodeModel::from_file(&input).unwrap();
-    assert_eq!(gcode.rel_xyz, false);
-    assert_eq!(gcode.rel_e, true);
+    assert!(!gcode.rel_xyz);
+    assert!(gcode.rel_e);
     use std::fs::File;
     use std::io::Write;
     let mut f = File::create(output.clone()).unwrap();

@@ -198,10 +198,8 @@ impl<'a> Cursor<'a> {
             if !self.is_purge_line(first.clone()) {
                 return 0..first.start;
             }
-            else {
-                if let Some(second) = shapes.pop() {
-                    return 0..second.start;
-                }
+            else if let Some(second) = shapes.pop() {
+                return 0..second.start;
             }
         }
         0..0
@@ -256,7 +254,7 @@ impl<'a> Cursor<'a> {
         heights.dedup();
         let mut heights = heights.iter().map(|x| (x * 1000.0) as u32).collect::<Vec<u32>>();
         heights.sort();
-        if heights.len() < 1 {
+        if heights.is_empty() {
             return (0, 0);
         }
         if heights.len() == 1 {

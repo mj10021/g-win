@@ -241,7 +241,7 @@ fn parse_line_test() {
     ];
     for (input, expected) in tests.iter_mut() {
         let debug = String::from(*input);
-        let result = parse_line(input).expect(format!("failed to parse: {}", debug).as_str());
+        let result = parse_line(input).unwrap_or_else(|_| panic!("failed to parse: {}", debug));
         assert_eq!(result, *expected);
     }
 }

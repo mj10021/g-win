@@ -26,7 +26,7 @@ fn open_gcode_file(path: &Path) -> Result<String, Box<dyn std::error::Error>> {
 #[test]
 fn open_gcode_file_test() {
     let path = Path::new("src/tests/test.gcode");
-    let _ = open_gcode_file(&path).unwrap();
+    let _ = open_gcode_file(path).unwrap();
 }
 
 /// Represent all possible gcode commands that we would
@@ -73,14 +73,13 @@ pub struct PrintMetadata {
 impl From<&GCodeModel> for PrintMetadata {
     fn from(gcode: &GCodeModel) -> Self {
         let mut cursor = analyzer::Cursor::from(gcode);
-        let mut out = PrintMetadata::default();
-        out.preprint = cursor.pre_print();
-        out.postprint = cursor.post_print();
-        out.relative_e = gcode.rel_e;
-        out.relative_xyz = gcode.rel_xyz;
-        out.layer_height = cursor.layer_height();
-        out
-
+        PrintMetadata {
+            preprint: cursor.pre_print(),
+            postprint: cursor.post_print(),
+            relative_e: gcode.rel_e,
+            relative_xyz: gcode.rel_xyz,
+            layer_height: cursor.layer_height(),
+        }
     }
 }
 /// Store all information for a .gcode file,
