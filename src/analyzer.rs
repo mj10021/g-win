@@ -9,9 +9,7 @@ fn calc_slope(a: [f32; 5], b: [f32; 5]) -> f32 {
 }
 fn is_extrusion(curr: [f32; 5], prev: [f32; 5]) -> bool {
     if curr[3] > 0.0 {
-        if curr[0] != prev[0] || curr[1] != prev[1] || curr[2] != prev[2] {
-            return true;
-        }
+        return curr[0] != prev[0] || curr[1] != prev[1] || curr[2] != prev[2];
     }
     false
 }
@@ -321,7 +319,7 @@ fn test_cursor() {
 let model = GCodeModel::from_file(&crate::tests::test_gcode_path().join("test.gcode")).unwrap();
     let mut cursor = Cursor::from(&model);
     assert!(cursor.is_planar());
-    let (first, second) = cursor.layer_height();
+    let (_first, second) = cursor.layer_height();
     //assert_eq!(first, 200);
     assert_eq!(second, 200);
 }
