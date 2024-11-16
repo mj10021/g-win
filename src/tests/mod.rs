@@ -1,6 +1,6 @@
 #![cfg(test)]
 use crate::GCodeModel;
-fn test_gcode_path() -> std::path::PathBuf {
+pub fn test_gcode_path() -> std::path::PathBuf {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
     std::path::Path::new(&manifest_dir)
         .join("src")

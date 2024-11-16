@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::ops::Range;
 
 use crate::{Command, GCodeModel};
@@ -8,6 +7,15 @@ fn calc_slope(a: [f32; 5], b: [f32; 5]) -> f32 {
     let dy = b[1] - a[1];
     dy / dx
 }
+fn is_extrusion(curr: [f32; 5], prev: [f32; 5]) -> bool {
+    if curr[3] > 0.0 {
+        if curr[0] != prev[0] || curr[1] != prev[1] || curr[2] != prev[2] {
+            return true;
+        }
+    }
+    false
+}
+
 
 #[derive(Clone, Copy)]
 pub struct Cursor<'a> {
@@ -55,7 +63,7 @@ impl<'a> Cursor<'a> {
         }
     }
 
-     fn next(&mut self) -> Result<&'a Command, &'static str> {
+    fn next(&mut self) -> Result<&'a Command, &'static str> {
         // attempt to move the cursor to the next line
         // and return the line number if successful
         if self.idx > self.parent.lines.len() - 2 {
@@ -64,6 +72,10 @@ impl<'a> Cursor<'a> {
         self.idx += 1;
         self.update();
         Ok(self.curr_command)
+    }
+
+    fn peek_next(&self) -> Result<&'a Command, &'static str> {
+        self.parent.lines.get(self.idx + 1).map(|line| &line.command).ok_or("End of file")
     }
 
     fn prev(&mut self) -> Result<&'a Command, &'static str> {
@@ -91,47 +103,53 @@ impl<'a> Cursor<'a> {
         child
 
     }
- 
-    fn is_extrusion(&self, prev: [f32; 5]) -> bool {
-        let [dx, dy, dz, _de, _df] = self
-            .state
-            .iter()
-            .zip(prev.iter())
-            .map(|(a, b)| a - b)
-            .collect::<Vec<f32>>()
-            .try_into()
-            .unwrap();
-        if let Command::G1 { e, .. } = self.curr_command {
-            if let Ok(e) = e.parse::<f32>() {
-                return e > 0.0 && (dx.abs() > f32::EPSILON || dy.abs() > f32::EPSILON || dz.abs() > f32::EPSILON);
-            }
-        }
-        false
-    }
 
-    fn next_shape(&mut self, shape_or_change: bool) -> Range<usize> {
-        // keep moving the cursor until a non exstrusion G1 is found
-        // shape_or_change should be true for shape detevtion and false for change detection
-        // FIXME: to automatically determine shape or change, we need to check the previous state
-        // from the initial cursor position
-        let bool_mod = !shape_or_change;
+    fn next_shape(&mut self) -> Result<Range<usize>, &'static str> {
+        // keep moving the cursor until a non exstrusion G1 is found if
+        // starting from an extrusion, or until an extrusion is found if
+        // starting from a non extrusion
         let mut init = self.state;
         let start = self.idx;
         let mut end = self.idx;
+        let is_ex: bool = 
+        {
+            let mut out = false;
+            if self.state[3] > 0.0 {
+                if let Ok(Command::G1 {x, y, z, ..}) = self.peek_next() {
+                    if let Ok(x) = x.parse::<f32>() {
+                        if (x - self.state[0]).abs() > f32::EPSILON {
+                            out = true;
+                        }
+                        if let Ok(y) = y.parse::<f32>() {
+                            if (y - self.state[1]).abs() > f32::EPSILON {
+                                out = true;
+                            }
+                        }
+                        if let Ok(z) = z.parse::<f32>() {
+                            if (z - self.state[2]).abs() > f32::EPSILON {
+                            out = true;
+                            }
+                        }
+                    }
+                }
+            }
+            out
+        };
         while self.next().is_ok() {
-            if bool_mod == self.is_extrusion(init) {
+            if is_ex != is_extrusion(self.state, init) {
                 break;
             }
             init = self.state;
             end = self.idx;
         }
-        start..end
+        Ok(start..end)
     }
 
     fn at_first_extrusion(&self) -> bool{
         let mut temp_cursor = *self;
+        let curr = temp_cursor.state;
         while temp_cursor.prev().is_ok() {
-            if temp_cursor.is_extrusion(temp_cursor.state) {
+            if is_extrusion(curr, temp_cursor.state) {
                 return false;
             }
         }
@@ -154,7 +172,7 @@ impl<'a> Cursor<'a> {
         // load all the shape positions into a vec while
         // checking if any extrusions are inside the main print area
         while cur.next().is_ok() {
-            if cur.is_extrusion(init) {
+            if is_extrusion(init, cur.state) {
                 shape_positions.push(cur.state);
                 if cur.state[0] > 2.0 && cur.state[1] > 2.0 {
                     return false;
@@ -181,36 +199,36 @@ impl<'a> Cursor<'a> {
 
     }
 
-    fn shapes(&mut self) -> Vec<Range<usize>> {
+    fn shapes(&mut self) -> Result<Vec<Range<usize>>, &'static str> {
         let mut shapes = Vec::new();
         self.reset();
         while self.next().is_ok() {
-            let range = self.next_shape(true);
+            let range = self.next_shape()?;
             shapes.push(range);
         }
-        shapes
+        Ok(shapes)
     }
 
-    pub fn pre_print(&mut self) -> Range<usize> {
-        let mut shapes = self.shapes();
+    pub fn pre_print(&mut self) -> Result<Range<usize>, &'static str> {
+        let mut shapes = self.shapes()?;
         shapes.reverse();
         if let Some(first) = shapes.pop() {
             if !self.is_purge_line(first.clone()) {
-                return 0..first.start;
+                return Ok(0..first.start);
             }
             else if let Some(second) = shapes.pop() {
-                return 0..second.start;
+                return Ok(0..second.start);
             }
         }
-        0..0
+        Err("No preprint found")
     }
 
-    pub fn post_print(&mut self) -> Range<usize> {
-        let mut shapes = self.shapes();
+    pub fn post_print(&mut self) -> Result<Range<usize>, &'static str> {
+        let mut shapes = self.shapes()?;
         if let Some(Range {end,..}) = shapes.pop() {
-            return end..self.parent.lines.len();
+            return Ok(end..self.parent.lines.len());
         }
-        self.parent.lines.len()..self.parent.lines.len()
+        Err("No postprint found")
     }
     fn nonplanar_extrusion(&self, prev: [f32; 5]) -> bool {
         let [_dx, _dy, dz, _de, _df] = self
@@ -246,7 +264,7 @@ impl<'a> Cursor<'a> {
             return (0, 0);
         }
         while self.next().is_ok() {
-            if self.is_extrusion(init) {
+            if is_extrusion(self.state,init) {
                 heights.push(self.state[2]);
             }
             init = self.state;
@@ -278,4 +296,32 @@ impl<'a> Cursor<'a> {
         }
         (first_layer_height, second_layer_height)
     }
+}
+
+#[cfg(test)]
+
+#[test]
+fn planar_test() {
+    use crate::tests;
+    let model = GCodeModel::from_file(&tests::test_gcode_path().join("test.gcode")).unwrap();
+    let mut cursor = Cursor::from(&model);
+    assert!(cursor.is_planar());
+}
+
+#[test]
+fn preprint_test() {
+    let model = GCodeModel::from_file(&crate::tests::test_gcode_path().join("test.gcode")).unwrap();
+    let mut cursor = Cursor::from(&model);
+    let range = cursor.pre_print();
+    assert_eq!(range, Ok(0..0));
+}
+
+#[test]
+fn test_cursor() {
+let model = GCodeModel::from_file(&crate::tests::test_gcode_path().join("test.gcode")).unwrap();
+    let mut cursor = Cursor::from(&model);
+    assert!(cursor.is_planar());
+    let (first, second) = cursor.layer_height();
+    //assert_eq!(first, 200);
+    assert_eq!(second, 200);
 }

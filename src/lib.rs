@@ -74,8 +74,8 @@ impl From<&GCodeModel> for PrintMetadata {
     fn from(gcode: &GCodeModel) -> Self {
         let mut cursor = analyzer::Cursor::from(gcode);
         PrintMetadata {
-            preprint: cursor.pre_print(),
-            postprint: cursor.post_print(),
+            preprint: cursor.pre_print().unwrap_or_default(),
+            postprint: cursor.post_print().unwrap_or_default(),
             relative_e: gcode.rel_e,
             relative_xyz: gcode.rel_xyz,
             layer_height: cursor.layer_height(),
