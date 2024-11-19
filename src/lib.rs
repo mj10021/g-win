@@ -38,28 +38,28 @@ fn open_gcode_file_test() {
 /// implement Eq and Hash
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Command<'a> {
+pub enum Command {
     G1 {
-        x: &'a [u8],
-        y: &'a [u8],
-        z: &'a [u8],
-        e: &'a [u8],
-        f: &'a [u8],
+        x: String,
+        y: String,
+        z: String,
+        e: String,
+        f: String,
     },
     G90,
     G91,
     M82,
     M83,
-    Raw(&'a [u8]),
+    Raw(String),
 }
 
 /// Store a single line of gcode, with an id, command,
 /// and comments
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct GCodeLine<'a> {
-    pub command: Command<'a>,
-    pub comments: &'a [u8],
+pub struct GCodeLine {
+    pub command: Command,
+    pub comments: String,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -85,7 +85,7 @@ impl Default for PrintMetadata {
     }
 }
 
-impl<'a> From<&'a GCodeModel<'a>> for PrintMetadata {
+impl From<&GCodeModel> for PrintMetadata {
     fn from(gcode: &GCodeModel) -> Self {
         let mut cursor = analyzer::Cursor::from(gcode);
         PrintMetadata {
@@ -104,20 +104,20 @@ impl<'a> From<&'a GCodeModel<'a>> for PrintMetadata {
 //~ NOTE: this struct is generated through the FromStr trait
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct GCodeModel<'a> {
-    pub lines: Vec<GCodeLine<'a>>, // keep track of line order
+pub struct GCodeModel {
+    pub lines: Vec<GCodeLine>, // keep track of line order
     pub rel_xyz: bool,
     pub rel_e: bool,
     pub metadata: PrintMetadata,
 }
 
-impl<'a> std::str::FromStr for GCodeModel<'a> {
+impl std::str::FromStr for GCodeModel {
     type Err = parsers::GCodeParseError;
     fn from_str(mut s: &str) -> Result<Self, Self::Err> {
         let gcode = parsers::gcode_parser(&mut s);
         match gcode {
             Ok(mut gcode) => {
-                let metadata = PrintMetadata::from(gcode.clone());
+                let metadata = PrintMetadata::from(&gcode);
                 gcode.metadata = metadata;
                 Ok(gcode)
             }

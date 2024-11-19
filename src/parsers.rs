@@ -131,7 +131,7 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
         let (line, comments) = line.split_once(';').unwrap_or((line, ""));
 
         // store a copy of the original line for unsupported commands
-        let string_copy = line.as_bytes();
+        let string_copy = String::from(line);
 
         // clear whitespace
         let line = line.split_whitespace().collect::<String>();
@@ -145,11 +145,11 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
                     .parse(rest)
                     .map_err(|e| GCodeParseError::from_parse(e, input))?;
                 Command::G1 {
-                    x: g1[0].as_bytes(),
-                    y: g1[1].as_bytes(),
-                    z: g1[2].as_bytes(),
-                    e: g1[3].as_bytes(),
-                    f: g1[4].as_bytes(),
+                    x: g1[0].to_string(),
+                    y: g1[1].to_string(),
+                    z: g1[2].to_string(),
+                    e: g1[3].to_string(),
+                    f: g1[4].to_string(),
                 }
             }
             Ok(("G", "90", _)) => {
@@ -172,7 +172,7 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
         };
         gcode.lines.push(GCodeLine {
             command,
-            comments: comments.as_bytes(),
+            comments: String::from(comments),
         });
     }
     Ok(gcode)
@@ -189,11 +189,11 @@ fn gcode_parser_test() {
         lines: vec![
             GCodeLine {
                 command: Command::G1 {
-                    x: "1.0".as_bytes(),
-                    y: ("2.0").as_bytes(),
-                    z: ("3.0").as_bytes(),
-                    e: ("4.0").as_bytes(),
-                    f: ("5.0").as_bytes(),
+                    x: String::from("1.0"),
+                    y: String::from("2.0"),
+                    z: String::from("3.0"),
+                    e: String::from("4.0"),
+                    f: String::from("5.0"),
                 },
                 comments: String::from("hello world"),
             },
