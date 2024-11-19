@@ -9,11 +9,12 @@ fn calc_slope(a: [f32; 5], b: [f32; 5]) -> f32 {
 }
 fn is_extrusion(curr: [f32; 5], prev: [f32; 5]) -> bool {
     if curr[3] > f32::EPSILON {
-        return (curr[0] - prev[0]).abs() > f32::EPSILON || (curr[1] - prev[1]).abs() > f32::EPSILON || (curr[2] - prev[2]).abs() > f32::EPSILON;
+        return (curr[0] - prev[0]).abs() > f32::EPSILON
+            || (curr[1] - prev[1]).abs() > f32::EPSILON
+            || (curr[2] - prev[2]).abs() > f32::EPSILON;
     }
     false
 }
-
 
 #[derive(Clone, Copy)]
 pub struct Cursor<'a> {
@@ -39,7 +40,6 @@ impl<'a> From<&'a GCodeModel> for Cursor<'a> {
 }
 
 impl<'a> Cursor<'a> {
-
     fn reset(&mut self) {
         self.idx = 0;
         self.update();
@@ -91,7 +91,6 @@ impl<'a> Cursor<'a> {
             let _ = child.next();
         }
         child
-
     }
 
     fn next_shape(&mut self) -> Result<RangeInclusive<usize>, &'static str> {
@@ -112,7 +111,7 @@ impl<'a> Cursor<'a> {
         Ok(start..=end)
     }
 
-    fn at_first_extrusion(&self) -> bool{
+    fn at_first_extrusion(&self) -> bool {
         let mut temp_cursor = *self;
         let curr = temp_cursor.state;
         while temp_cursor.prev().is_ok() {
@@ -121,15 +120,14 @@ impl<'a> Cursor<'a> {
             }
         }
         true
-
     }
 
     fn is_purge_line(&mut self, lines: RangeInclusive<usize>) -> bool {
-        // determining what is a purge line based on 
+        // determining what is a purge line based on
         //     1) is it the first extrusion of the print
         //     2) is it outside of the print area
         //     3) can you fit the shape to a line
-        let  start = lines.start();
+        let start = lines.start();
         let mut cur = self.child_at(*start);
         if !cur.at_first_extrusion() {
             return false;
@@ -159,11 +157,10 @@ impl<'a> Cursor<'a> {
                     return false;
                 }
                 slope = slope_i;
-            } 
+            }
         }
 
         true
-
     }
 
     fn shapes(&mut self) -> Result<Vec<RangeInclusive<usize>>, &'static str> {
@@ -182,8 +179,7 @@ impl<'a> Cursor<'a> {
         if let Some(first) = shapes.pop() {
             if !self.is_purge_line(first.clone()) {
                 return Ok(RangeInclusive::new(0, first.start() - 1));
-            }
-            else if let Some(second) = shapes.pop() {
+            } else if let Some(second) = shapes.pop() {
                 return Ok(RangeInclusive::new(0, second.start() - 1));
             }
         }
@@ -193,7 +189,10 @@ impl<'a> Cursor<'a> {
     pub fn post_print(&mut self) -> Result<RangeInclusive<usize>, &'static str> {
         let mut shapes = self.shapes()?;
         if let Some(range_inclusive) = shapes.pop() {
-            return Ok(RangeInclusive::new(range_inclusive.end() + 1, self.parent.lines.len() - 1));
+            return Ok(RangeInclusive::new(
+                range_inclusive.end() + 1,
+                self.parent.lines.len() - 1,
+            ));
         }
         Err("No postprint found")
     }
@@ -231,13 +230,16 @@ impl<'a> Cursor<'a> {
             return (0, 0);
         }
         while self.next().is_ok() {
-            if is_extrusion(self.state,init) {
+            if is_extrusion(self.state, init) {
                 heights.push(self.state[2]);
             }
             init = self.state;
         }
         heights.dedup();
-        let mut heights = heights.iter().map(|x| (x * 1000.0) as u32).collect::<Vec<u32>>();
+        let mut heights = heights
+            .iter()
+            .map(|x| (x * 1000.0) as u32)
+            .collect::<Vec<u32>>();
         heights.sort();
         if heights.is_empty() {
             return (0, 0);
@@ -266,9 +268,8 @@ impl<'a> Cursor<'a> {
 }
 
 #[cfg(test)]
-
 #[test]
-fn slope_test(){
+fn slope_test() {
     let a = [0.0, 0.0, 0.0, 0.0, 0.0];
     let b = [1.0, 1.0, 0.0, 0.0, 0.0];
     assert_eq!(calc_slope(a, b), 1.0);
@@ -287,7 +288,11 @@ fn is_extrusion_test() {
         ([0.0, 0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0], false),
         ([0.0, 1.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0, 0.0], true),
         ([0.0, 1.0, 0.0, 1.0, 0.0], [1.0, 1.0, 0.0, 1.0, 0.0], true),
-        ([50.0, -1.0, 3.0, 25.0, 900.0], [0.0, -1.0, 3.0, 0.0, 900.0], true),
+        (
+            [50.0, -1.0, 3.0, 25.0, 900.0],
+            [0.0, -1.0, 3.0, 0.0, 900.0],
+            true,
+        ),
     ];
     for (curr, prev, expected) in tests.iter() {
         assert_eq!(is_extrusion(*curr, *prev), *expected);
@@ -312,7 +317,7 @@ fn preprint_test() {
 
 #[test]
 fn test_cursor() {
-let model = GCodeModel::from_file(&crate::tests::test_gcode_path().join("test.gcode")).unwrap();
+    let model = GCodeModel::from_file(&crate::tests::test_gcode_path().join("test.gcode")).unwrap();
     let mut cursor = Cursor::from(&model);
     assert!(cursor.is_planar());
     let (_first, second) = cursor.layer_height();

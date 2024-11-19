@@ -33,8 +33,8 @@ fn open_gcode_file_test() {
 /// like to handle, leaving any unknown commands as raw strings.
 /// Specific structs to store information for each command can
 /// be added as needed.
-/// 
-/// G1 params are parsed into floats later on so that the enum can 
+///
+/// G1 params are parsed into floats later on so that the enum can
 /// implement Eq and Hash
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

@@ -1,4 +1,4 @@
-use crate::*;
+use crate::{Command, GCodeLine, GCodeModel};
 use std::fmt::{self, Display};
 
 impl fmt::Display for Command {
