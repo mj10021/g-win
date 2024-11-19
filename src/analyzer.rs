@@ -46,20 +46,17 @@ impl<'a> Cursor<'a> {
     }
 
     fn update(&mut self) {
-        match self.parent.lines.get(self.idx) {
-            Some(line) => {
-                self.curr_command = &line.command;
-                if let Command::G1 {x, y, z, e, f} = self.curr_command {
-                    self.state = [
-                        x.parse().unwrap_or(self.state[0]),
-                        y.parse().unwrap_or(self.state[1]),
-                        z.parse().unwrap_or(self.state[2]),
-                        e.parse().unwrap_or(self.state[3]),
-                        f.parse().unwrap_or(self.state[4]),
-                    ];
-                }
+        if let Some(line) = self.parent.lines.get(self.idx) {
+            self.curr_command = &line.command;
+            if let Command::G1 {x, y, z, e, f} = self.curr_command {
+                self.state = [
+                    x.parse().unwrap_or(self.state[0]),
+                    y.parse().unwrap_or(self.state[1]),
+                    z.parse().unwrap_or(self.state[2]),
+                    e.parse().unwrap_or(self.state[3]),
+                    f.parse().unwrap_or(self.state[4]),
+                ];
             }
-            _ => {}
         }
     }
 
