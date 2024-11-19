@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::ops::RangeInclusive;
 
 use crate::{Command, GCodeModel};
 
@@ -8,8 +8,8 @@ fn calc_slope(a: [f32; 5], b: [f32; 5]) -> f32 {
     dy / dx
 }
 fn is_extrusion(curr: [f32; 5], prev: [f32; 5]) -> bool {
-    if curr[3] > 0.0 {
-        return curr[0] != prev[0] || curr[1] != prev[1] || curr[2] != prev[2];
+    if curr[3] > f32::EPSILON {
+        return (curr[0] - prev[0]).abs() > f32::EPSILON || (curr[1] - prev[1]).abs() > f32::EPSILON || (curr[2] - prev[2]).abs() > f32::EPSILON;
     }
     false
 }
@@ -20,19 +20,21 @@ pub struct Cursor<'a> {
     parent: &'a GCodeModel,
     idx: usize,
     state: [f32; 5],
-    prev: Option<[f32; 5]>,
+    prev: [f32; 5],
     curr_command: &'a Command,
 }
 
 impl<'a> From<&'a GCodeModel> for Cursor<'a> {
     fn from(parent: &'a GCodeModel) -> Self {
-        Cursor {
+        let mut cursor = Cursor {
             parent,
             idx: 0,
             state: [0.0; 5],
-            prev: None,
+            prev: [0.0; 5],
             curr_command: &parent.lines[0].command,
-        }
+        };
+        cursor.update();
+        cursor
     }
 }
 
@@ -45,7 +47,7 @@ impl<'a> Cursor<'a> {
 
     fn update(&mut self) {
         let curr = self.state;
-        self.prev = Some(curr);
+        self.prev = curr;
         self.curr_command = match self.parent.lines.get(self.idx) {
             Some(line) => &line.command,
             None => panic!("asdf"),
@@ -61,19 +63,15 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    fn next(&mut self) -> Result<&'a Command, &'static str> {
+    fn next(&mut self) -> Result<[f32; 5], &'static str> {
         // attempt to move the cursor to the next line
         // and return the line number if successful
-        if self.idx > self.parent.lines.len() - 2 {
+        if self.parent.lines.len() - self.idx < 2 {
             return Err("End of file");
         }
         self.idx += 1;
         self.update();
-        Ok(self.curr_command)
-    }
-
-    fn peek_next(&self) -> Result<&'a Command, &'static str> {
-        self.parent.lines.get(self.idx + 1).map(|line| &line.command).ok_or("End of file")
+        Ok(self.state)
     }
 
     fn prev(&mut self) -> Result<&'a Command, &'static str> {
@@ -88,13 +86,7 @@ impl<'a> Cursor<'a> {
     }
 
     fn child_at(&self, idx: usize) -> Cursor<'a> {
-        let mut child = Cursor {
-            parent: self.parent,
-            idx: 0,
-            state: [0.0; 5],
-            prev: None,
-            curr_command: &self.parent.lines[0].command,
-        };
+        let mut child = Cursor::from(self.parent);
         while child.idx < idx {
             let _ = child.next();
         }
@@ -102,45 +94,22 @@ impl<'a> Cursor<'a> {
 
     }
 
-    fn next_shape(&mut self) -> Result<Range<usize>, &'static str> {
+    fn next_shape(&mut self) -> Result<RangeInclusive<usize>, &'static str> {
         // keep moving the cursor until a non exstrusion G1 is found if
         // starting from an extrusion, or until an extrusion is found if
         // starting from a non extrusion
-        let mut init = self.state;
         let start = self.idx;
         let mut end = self.idx;
-        let is_ex: bool = 
-        {
-            let mut out = false;
-            if self.state[3] > 0.0 {
-                if let Ok(Command::G1 {x, y, z, ..}) = self.peek_next() {
-                    if let Ok(x) = x.parse::<f32>() {
-                        if (x - self.state[0]).abs() > f32::EPSILON {
-                            out = true;
-                        }
-                        if let Ok(y) = y.parse::<f32>() {
-                            if (y - self.state[1]).abs() > f32::EPSILON {
-                                out = true;
-                            }
-                        }
-                        if let Ok(z) = z.parse::<f32>() {
-                            if (z - self.state[2]).abs() > f32::EPSILON {
-                            out = true;
-                            }
-                        }
-                    }
-                }
-            }
-            out
-        };
-        while self.next().is_ok() {
-            if is_ex != is_extrusion(self.state, init) {
+        let init_ex = is_extrusion(self.state, self.prev);
+        let mut prev = self.state;
+        while let Ok(state) = self.next() {
+            if init_ex != is_extrusion(state, prev) {
                 break;
             }
-            init = self.state;
             end = self.idx;
+            prev = state;
         }
-        Ok(start..end)
+        Ok(start..=end)
     }
 
     fn at_first_extrusion(&self) -> bool{
@@ -155,13 +124,13 @@ impl<'a> Cursor<'a> {
 
     }
 
-    fn is_purge_line(&mut self, lines: Range<usize>) -> bool {
+    fn is_purge_line(&mut self, lines: RangeInclusive<usize>) -> bool {
         // determining what is a purge line based on 
         //     1) is it the first extrusion of the print
         //     2) is it outside of the print area
         //     3) can you fit the shape to a line
-        let Range { start, .. } = lines;
-        let mut cur = self.child_at(start);
+        let  start = lines.start();
+        let mut cur = self.child_at(*start);
         if !cur.at_first_extrusion() {
             return false;
         }
@@ -197,7 +166,7 @@ impl<'a> Cursor<'a> {
 
     }
 
-    fn shapes(&mut self) -> Result<Vec<Range<usize>>, &'static str> {
+    fn shapes(&mut self) -> Result<Vec<RangeInclusive<usize>>, &'static str> {
         let mut shapes = Vec::new();
         self.reset();
         while self.next().is_ok() {
@@ -207,24 +176,24 @@ impl<'a> Cursor<'a> {
         Ok(shapes)
     }
 
-    pub fn pre_print(&mut self) -> Result<Range<usize>, &'static str> {
+    pub fn pre_print(&mut self) -> Result<RangeInclusive<usize>, &'static str> {
         let mut shapes = self.shapes()?;
         shapes.reverse();
         if let Some(first) = shapes.pop() {
             if !self.is_purge_line(first.clone()) {
-                return Ok(0..first.start);
+                return Ok(RangeInclusive::new(0, first.start() - 1));
             }
             else if let Some(second) = shapes.pop() {
-                return Ok(0..second.start);
+                return Ok(RangeInclusive::new(0, second.start() - 1));
             }
         }
         Err("No preprint found")
     }
 
-    pub fn post_print(&mut self) -> Result<Range<usize>, &'static str> {
+    pub fn post_print(&mut self) -> Result<RangeInclusive<usize>, &'static str> {
         let mut shapes = self.shapes()?;
-        if let Some(Range {end,..}) = shapes.pop() {
-            return Ok(end..self.parent.lines.len());
+        if let Some(range_inclusive) = shapes.pop() {
+            return Ok(RangeInclusive::new(range_inclusive.end() + 1, self.parent.lines.len() - 1));
         }
         Err("No postprint found")
     }
@@ -299,6 +268,33 @@ impl<'a> Cursor<'a> {
 #[cfg(test)]
 
 #[test]
+fn slope_test(){
+    let a = [0.0, 0.0, 0.0, 0.0, 0.0];
+    let b = [1.0, 1.0, 0.0, 0.0, 0.0];
+    assert_eq!(calc_slope(a, b), 1.0);
+    let a = [0.0, 0.0, 0.0, 0.0, 0.0];
+    let b = [1.0, 0.0, 0.0, 0.0, 0.0];
+    assert_eq!(calc_slope(a, b), 0.0);
+    let a = [0.0, 0.0, 0.0, 0.0, 0.0];
+    let b = [10.0, 1.0, 0.0, 0.0, 0.0];
+    assert_eq!(calc_slope(a, b), 0.10);
+}
+
+#[test]
+fn is_extrusion_test() {
+    let tests = [
+        ([0.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0], false),
+        ([0.0, 0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0], false),
+        ([0.0, 1.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0, 0.0], true),
+        ([0.0, 1.0, 0.0, 1.0, 0.0], [1.0, 1.0, 0.0, 1.0, 0.0], true),
+        ([50.0, -1.0, 3.0, 25.0, 900.0], [0.0, -1.0, 3.0, 0.0, 900.0], true),
+    ];
+    for (curr, prev, expected) in tests.iter() {
+        assert_eq!(is_extrusion(*curr, *prev), *expected);
+    }
+}
+
+#[test]
 fn planar_test() {
     use crate::tests;
     let model = GCodeModel::from_file(&tests::test_gcode_path().join("test.gcode")).unwrap();
@@ -311,7 +307,7 @@ fn preprint_test() {
     let model = GCodeModel::from_file(&crate::tests::test_gcode_path().join("test.gcode")).unwrap();
     let mut cursor = Cursor::from(&model);
     let range = cursor.pre_print();
-    assert_eq!(range, Ok(0..0));
+    assert_eq!(range, Ok(0..=100));
 }
 
 #[test]
@@ -322,4 +318,42 @@ let model = GCodeModel::from_file(&crate::tests::test_gcode_path().join("test.gc
     let (_first, second) = cursor.layer_height();
     //assert_eq!(first, 200);
     assert_eq!(second, 200);
+}
+#[test]
+fn alt_shape_test() {
+    let tests = [
+        ("G1 X10 Y10 E10", Ok(0..=0)),
+        ("G1 X10 Y10 E10\nG1 X20 Y20 E20", Ok(0..=1)),
+        ("G1 X10 Y10 E10\nG1 X20 Y20 E20\nG1 X30 Y30 E30", Ok(0..=2)),
+    ];
+    for (line, expected) in tests.iter() {
+        let model: GCodeModel = line.parse().unwrap();
+        let mut cursor = Cursor::from(&model);
+        let next = cursor.next_shape();
+        assert_eq!(next, *expected);
+    }
+}
+#[test]
+fn shape_test() {
+    let test_gcode = "
+        G1 Z3 F900
+        G1 X0 Y-1
+        G1 X50 Y-1 E25
+        G1 X25 E10
+        G1 E-1.5
+        G1 Z1
+        G1 X50 Y50
+        G1 Z0.2 E1
+        G1 X50 Y100 E12.222 
+    ";
+    let model: GCodeModel = test_gcode.parse().unwrap();
+    let mut cursor = Cursor::from(&model);
+    let expected_results = [0..=1, 2..=3, 4..=7, 8..=8];
+    for expected in expected_results.iter() {
+        let next = cursor.next_shape();
+        assert_eq!(next, Ok(expected.clone()));
+    }
+    let mut cursor = Cursor::from(&model);
+    let shapes = cursor.shapes();
+    assert_eq!(shapes, Ok(vec![0..=1, 2..=3, 4..=7, 8..=8]));
 }
