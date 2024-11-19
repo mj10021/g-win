@@ -1,6 +1,6 @@
 use std::ops::RangeInclusive;
 
-use crate::{Command, GCodeModel};
+use crate::{Command, GCodeLine, GCodeModel};
 
 fn calc_slope(a: [f32; 5], b: [f32; 5]) -> f32 {
     let dx = b[0] - a[0];
@@ -30,8 +30,8 @@ impl<'a> From<&'a GCodeModel> for Cursor<'a> {
         let mut cursor = Cursor {
             parent,
             idx: 0,
-            state: [0.0; 5],
-            prev: [0.0; 5],
+            state: [f32::NEG_INFINITY; 5],
+            prev: [f32::NEG_INFINITY; 5],
             curr_command: &parent.lines[0].command,
         };
         cursor.update();
@@ -46,20 +46,20 @@ impl<'a> Cursor<'a> {
     }
 
     fn update(&mut self) {
-        let curr = self.state;
-        self.prev = curr;
-        self.curr_command = match self.parent.lines.get(self.idx) {
-            Some(line) => &line.command,
-            None => panic!("asdf"),
-        };
-        if let Command::G1 { x, y, z, e, f } = self.curr_command {
-            self.state = [
-                x.parse().unwrap_or(curr[0]),
-                y.parse().unwrap_or(curr[1]),
-                z.parse().unwrap_or(curr[2]),
-                e.parse().unwrap_or(curr[3]),
-                f.parse().unwrap_or(curr[4]),
-            ];
+        match self.parent.lines.get(self.idx) {
+            Some(line) => {
+                self.curr_command = &line.command;
+                if let Command::G1 {x, y, z, e, f} = self.curr_command {
+                    self.state = [
+                        x.parse().unwrap_or(self.state[0]),
+                        y.parse().unwrap_or(self.state[1]),
+                        z.parse().unwrap_or(self.state[2]),
+                        e.parse().unwrap_or(self.state[3]),
+                        f.parse().unwrap_or(self.state[4]),
+                    ];
+                }
+            }
+            _ => {}
         }
     }
 
@@ -69,7 +69,9 @@ impl<'a> Cursor<'a> {
         if self.parent.lines.len() - self.idx < 2 {
             return Err("End of file");
         }
+        let new_prev = self.state;
         self.idx += 1;
+        self.prev = new_prev;
         self.update();
         Ok(self.state)
     }
@@ -80,11 +82,12 @@ impl<'a> Cursor<'a> {
         if self.idx == 0 {
             return Err("Start of file");
         }
+        let new_prev = self.state;
         self.idx -= 1;
+        self.prev = new_prev;
         self.update();
         Ok(self.curr_command)
     }
-
     fn child_at(&self, idx: usize) -> Cursor<'a> {
         let mut child = Cursor::from(self.parent);
         while child.idx < idx {
