@@ -2,7 +2,7 @@
 #![doc = include_str!("../README.md")]
 
 pub mod analyzer;
-pub mod emit;
+mod display;
 mod parsers;
 mod tests;
 
