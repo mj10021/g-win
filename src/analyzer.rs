@@ -1,6 +1,6 @@
 use std::ops::RangeInclusive;
 
-use crate::{Command, GCodeLine, GCodeModel};
+use crate::*;
 
 fn calc_slope(a: [f32; 5], b: [f32; 5]) -> f32 {
     let dx = b[0] - a[0];
