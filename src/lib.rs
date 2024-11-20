@@ -50,6 +50,7 @@ pub enum Command {
     G91,
     M82,
     M83,
+    Home(String),
     Raw(String),
 }
 

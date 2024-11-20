@@ -1,3 +1,4 @@
+use core::panic;
 use std::ops::RangeInclusive;
 
 use crate::*;
@@ -46,17 +47,23 @@ impl<'a> Cursor<'a> {
     }
 
     fn update(&mut self) {
-        if let Some(line) = self.parent.lines.get(self.idx) {
-            self.curr_command = &line.command;
-            if let Command::G1 {x, y, z, e, f} = self.curr_command {
-                self.state = [
+        let line = self.parent.lines.get(self.idx).unwrap();
+        self.curr_command = &line.command;
+        self.state = match self.curr_command {
+            Command::G1 {x, y, z, e, f} => {
+                [
                     x.parse().unwrap_or(self.state[0]),
                     y.parse().unwrap_or(self.state[1]),
                     z.parse().unwrap_or(self.state[2]),
                     e.parse().unwrap_or(self.state[3]),
                     f.parse().unwrap_or(self.state[4]),
-                ];
+                ]
             }
+            Command::Home(_) => {
+                [0.0, 0.0, 0.0, 0.0, 0.0]
+            }
+            _ => self.state,
+
         }
     }
 
@@ -319,10 +326,13 @@ fn preprint_test() {
 fn test_cursor() {
     let model = GCodeModel::from_file(&crate::tests::test_gcode_path().join("test.gcode")).unwrap();
     let mut cursor = Cursor::from(&model);
-    assert!(cursor.is_planar());
-    let (_first, second) = cursor.layer_height();
-    //assert_eq!(first, 200);
-    assert_eq!(second, 200);
+    loop {
+        if let Some(GCodeLine { command: Command::G1 { .. }, .. }) = cursor.parent.lines.get(cursor.idx) {
+            break;
+        }
+        let _ = cursor.next();
+    }
+    panic!("{:?}", cursor.state);
 }
 #[test]
 fn alt_shape_test() {

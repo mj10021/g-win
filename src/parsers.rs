@@ -152,6 +152,7 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
                     f: g1[4].to_string(),
                 }
             }
+            Ok(("G", "28", _)) => Command::Home(string_copy),
             Ok(("G", "90", _)) => {
                 gcode.rel_xyz = false;
                 Command::G90
@@ -198,7 +199,7 @@ fn gcode_parser_test() {
                 comments: String::from("hello world"),
             },
             GCodeLine {
-                command: Command::Raw(String::from("G28 W ")),
+                command: Command::Home(String::from("G28 W ")),
                 comments: String::from(" hello world"),
             },
             GCodeLine {

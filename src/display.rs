@@ -24,7 +24,7 @@ impl fmt::Display for Command {
             Command::G91 => write!(f, "G91"),
             Command::M82 => write!(f, "M82"),
             Command::M83 => write!(f, "M83"),
-            Command::Raw(s) => write!(f, "{}", s),
+            Command::Home(s) | Command::Raw(s) => write!(f, "{}", s),
         }
     }
 }
