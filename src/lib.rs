@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use std::{io::Write, path::Path};
 
-use microns::Microns;
+pub use microns::Microns;
 
 // check that path is to a file with the correct extension and read to String
 fn open_gcode_file(path: &Path) -> Result<String, Box<dyn std::error::Error>> {

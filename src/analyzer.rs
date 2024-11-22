@@ -17,6 +17,21 @@ fn is_extrusion(curr: [Microns; 5], prev: [Microns; 5]) -> bool {
     false
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum CursorError {
+    StartOfFile,
+    EndOfFile,
+} 
+
+impl std::fmt::Display for CursorError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            CursorError::StartOfFile => write!(f, "Start of file"),
+            CursorError::EndOfFile => write!(f, "End of file"),
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct Cursor<'a> {
     parent: &'a GCodeModel,
@@ -62,11 +77,11 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    fn next(&mut self) -> Result<[Microns; 5], &'static str> {
+    fn next(&mut self) -> Result<[Microns; 5], CursorError> {
         // attempt to move the cursor to the next line
         // and return the line number if successful
-        if self.parent.lines.len() - self.idx < 2 {
-            return Err("End of file");
+        if self.idx == self.parent.lines.len() - 1 {
+            return Err(CursorError::EndOfFile);
         }
         let new_prev = self.state;
         self.idx += 1;
@@ -75,11 +90,11 @@ impl<'a> Cursor<'a> {
         Ok(self.state)
     }
 
-    fn prev(&mut self) -> Result<&'a Command, &'static str> {
+    fn prev(&mut self) -> Result<&'a Command, CursorError> {
         // attempt to move the cursor to the previous line
         // and return the line number if successful
         if self.idx == 0 {
-            return Err("Start of file");
+            return Err(CursorError::StartOfFile);
         }
         let new_prev = self.state;
         self.idx -= 1;
@@ -95,33 +110,25 @@ impl<'a> Cursor<'a> {
         child
     }
 
-    fn next_shape(&mut self) -> Result<RangeInclusive<usize>, &'static str> {
+    fn next_shape(&mut self) -> RangeInclusive<usize> {
         // keep moving the cursor until a non exstrusion G1 is found if
         // starting from an extrusion, or until an extrusion is found if
         // starting from a non extrusion
-        if self.idx > self.parent.lines.len() - 1 {
-            return Err("End of file");
+        if self.idx == self.parent.lines.len() - 1 {
+            return self.idx..=self.idx;
         }
         let start = self.idx;
         let mut end = self.idx;
         let init_ex = is_extrusion(self.state, self.prev);
         let mut prev = self.state;
-        let mut eof = true;
         while let Ok(state) = self.next() {
-            eof = false;
             if init_ex != is_extrusion(state, prev) {
                 break;
             }
             end = self.idx;
             prev = state;
         }
-        // if end of file, increment the index by one
-        // so the next iteration of next_shape will return
-        // an eof error
-        if eof {
-            self.idx += 1;
-        }
-        Ok(start..=end)
+        start..=end
     }
 
     fn at_first_extrusion(&self) -> bool {
@@ -176,17 +183,17 @@ impl<'a> Cursor<'a> {
         true
     }
 
-    fn shapes(&mut self) -> Result<Vec<RangeInclusive<usize>>, &'static str> {
+    fn shapes(&mut self) -> Vec<RangeInclusive<usize>> {
         let mut shapes = Vec::new();
         self.reset();
-        while let Ok(range) = self.next_shape() {
-            shapes.push(range);
+        while self.idx < self.parent.lines.len() - 1 {
+            shapes.push(self.next_shape());
         }
-        Ok(shapes)
+        shapes
     }
 
     pub fn pre_print(&mut self) -> Result<RangeInclusive<usize>, &'static str> {
-        let mut shapes = self.shapes()?;
+        let mut shapes = self.shapes();
         shapes.reverse();
         if let Some(first) = shapes.pop() {
             if !self.is_purge_line(first.clone()) {
@@ -199,7 +206,7 @@ impl<'a> Cursor<'a> {
     }
 
     pub fn post_print(&mut self) -> Result<RangeInclusive<usize>, &'static str> {
-        let mut shapes = self.shapes()?;
+        let mut shapes = self.shapes();
         if let Some(range_inclusive) = shapes.pop() {
             return Ok(RangeInclusive::new(
                 range_inclusive.end() + 1,
@@ -351,6 +358,12 @@ fn preprint_test() {
 fn test_cursor() {
     let model = GCodeModel::from_file(&crate::tests::test_gcode_path().join("test.gcode")).unwrap();
     let mut cursor = Cursor::from(&model);
+    assert_eq!(cursor.idx, 0);
+    for i in 0..100 {
+        let _ = cursor.next();
+        assert_eq!(cursor.idx, i + 1);
+    }
+
     loop {
         if let Some(GCodeLine {
             command: Command::G1 { .. },
@@ -361,14 +374,13 @@ fn test_cursor() {
         }
         let _ = cursor.next();
     }
-    panic!("{:?}", cursor.state);
 }
 #[test]
 fn alt_shape_test() {
     let tests = [
-        ("G1 X10 Y10 E10", Ok(0..=0)),
-        ("G1 X10 Y10 E10\nG1 X20 Y20 E20", Ok(0..=1)),
-        ("G1 X10 Y10 E10\nG1 X20 Y20 E20\nG1 X30 Y30 E30", Ok(0..=2)),
+        ("G1 X10 Y10 E10", 0..=0),
+        ("G1 X10 Y10 E10\nG1 X20 Y20 E20", 0..=1),
+        ("G1 X10 Y10 E10\nG1 X20 Y20 E20\nG1 X30 Y30 E30", 0..=2),
     ];
     for (line, expected) in tests.iter() {
         let model: GCodeModel = line.parse().unwrap();
@@ -393,12 +405,11 @@ fn shape_test() {
     let model: GCodeModel = test_gcode.parse().unwrap();
     let mut cursor = Cursor::from(&model);
     let expected_results = [0..=1, 2..=3, 4..=7, 8..=8];
-    panic!("{:?}", cursor.shapes());
     for expected in expected_results.iter() {
         let next = cursor.next_shape();
-        assert_eq!(next, Ok(expected.clone()));
+        assert_eq!(next, expected.clone());
     }
     let mut cursor = Cursor::from(&model);
     let shapes = cursor.shapes();
-    assert_eq!(shapes, Ok(vec![0..=1, 2..=3, 4..=7, 8..=8]));
+    assert_eq!(shapes, vec![0..=1, 2..=3, 4..=7, 8..=8]);
 }
