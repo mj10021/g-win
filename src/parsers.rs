@@ -1,4 +1,4 @@
-use crate::{Command, GCodeLine, GCodeModel};
+use crate::*;
 use winnow::{
     ascii::multispace1,
     combinator::{rest, separated_pair},
@@ -145,11 +145,11 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
                     .parse(rest)
                     .map_err(|e| GCodeParseError::from_parse(e, input))?;
                 Command::G1 {
-                    x: g1[0].to_string(),
-                    y: g1[1].to_string(),
-                    z: g1[2].to_string(),
-                    e: g1[3].to_string(),
-                    f: g1[4].to_string(),
+                    x: g1[0].parse().ok(),
+                    y: g1[1].parse().ok(),
+                    z: g1[2].parse().ok(),
+                    e: g1[3].parse().ok(),
+                    f: g1[4].parse().ok(),
                 }
             }
             Ok(("G", "28", _)) => Command::Home(string_copy),
@@ -190,11 +190,11 @@ fn gcode_parser_test() {
         lines: vec![
             GCodeLine {
                 command: Command::G1 {
-                    x: String::from("1.0"),
-                    y: String::from("2.0"),
-                    z: String::from("3.0"),
-                    e: String::from("4.0"),
-                    f: String::from("5.0"),
+                    x: Some(Microns::from(1.0)),
+                    y: Some(Microns::from(2.0)),
+                    z: Some(Microns::from(3.0)),
+                    e: Some(Microns::from(4.0)),
+                    f: Some(Microns::from(5.0)),
                 },
                 comments: String::from("hello world"),
             },
@@ -296,82 +296,82 @@ fn g1_parameter_parse_test() {
         (
             "X1.0Y2.0Z3.0E4.0F5.0",
             Command::G1 {
-                x: String::from("1.0"),
-                y: String::from("2.0"),
-                z: String::from("3.0"),
-                e: String::from("4.0"),
-                f: String::from("5.0"),
+                x: Some(Microns::from(1.0)),
+                y: Some(Microns::from(2.0)),
+                z: Some(Microns::from(3.0)),
+                e: Some(Microns::from(4.0)),
+                f: Some(Microns::from(5.0)),
             },
         ),
         (
             "X1.0Y2.0Z3.0E4.0",
             Command::G1 {
-                x: String::from("1.0"),
-                y: String::from("2.0"),
-                z: String::from("3.0"),
-                e: String::from("4.0"),
-                f: String::new(),
+                x: Some(Microns::from(1.0)),
+                y: Some(Microns::from(2.0)),
+                z: Some(Microns::from(3.0)),
+                e: Some(Microns::from(4.0)),
+                f: None,
             },
         ),
         (
             "X1.0Y2.0Z3.0",
             Command::G1 {
-                x: String::from("1.0"),
-                y: String::from("2.0"),
-                z: String::from("3.0"),
-                e: String::new(),
-                f: String::new(),
+                x: Some(Microns::from(1.0)),
+                y: Some(Microns::from(2.0)),
+                z: Some(Microns::from(3.0)),
+                e: None,
+                f: None,
             },
         ),
         (
             "X1.0Y2.0",
             Command::G1 {
-                x: String::from("1.0"),
-                y: String::from("2.0"),
-                z: String::new(),
-                e: String::new(),
-                f: String::new(),
+                x: Some(Microns::from(1.0)),
+                y: Some(Microns::from(2.0)),
+                z: None,
+                e: None,
+                f: None,
             },
         ),
         (
             "X1.0",
             Command::G1 {
-                x: String::from("1.0"),
-                y: String::new(),
-                z: String::new(),
-                e: String::new(),
-                f: String::new(),
+                x: Some(Microns::from(1.0)),
+                y: None,
+                z: None,
+                e: None,
+                f: None,
             },
         ),
         (
             "Y-2.0",
             Command::G1 {
-                x: String::new(),
-                y: String::from("-2.0"),
-                z: String::new(),
-                e: String::new(),
-                f: String::new(),
+                x: None,
+                y: Some(Microns::from(-2.0)),
+                z: None,
+                e: None,
+                f: None,
             },
         ),
         (
             "Z0.000000001",
             Command::G1 {
-                x: String::new(),
-                y: String::new(),
-                z: String::from("0.000000001"),
-                e: String::new(),
-                f: String::new(),
+                x: None,
+                y: None,
+                z: Some(Microns::from(0.000000001)),
+                e: None,
+                f: None,
             },
         ),
     ];
     for (mut input, expected) in tests.iter_mut() {
         let result = g1_parameter_parse(&mut input).unwrap();
         let result = Command::G1 {
-            x: String::from(result[0]),
-            y: String::from(result[1]),
-            z: String::from(result[2]),
-            e: String::from(result[3]),
-            f: String::from(result[4]),
+            x: result[0].parse().ok(),
+            y: result[1].parse().ok(),
+            z: result[2].parse().ok(),
+            e: result[3].parse().ok(),
+            f: result[4].parse().ok(),
         };
         assert_eq!(result, *expected);
     }

@@ -3,6 +3,7 @@
 
 pub mod analyzer;
 mod display;
+pub mod microns;
 mod parsers;
 mod tests;
 
@@ -10,6 +11,8 @@ mod tests;
 use serde::{Deserialize, Serialize};
 
 use std::{io::Write, path::Path};
+
+use microns::Microns;
 
 // check that path is to a file with the correct extension and read to String
 fn open_gcode_file(path: &Path) -> Result<String, Box<dyn std::error::Error>> {
@@ -40,11 +43,11 @@ fn open_gcode_file_test() {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Command {
     G1 {
-        x: String,
-        y: String,
-        z: String,
-        e: String,
-        f: String,
+        x: Option<Microns>,
+        y: Option<Microns>,
+        z: Option<Microns>,
+        e: Option<Microns>,
+        f: Option<Microns>,
     },
     G90,
     G91,
@@ -71,7 +74,7 @@ pub struct PrintMetadata {
     preprint: std::ops::RangeInclusive<usize>,
     postprint: std::ops::RangeInclusive<usize>,
     /// micrometers (first layer, rest of layers((0, 0) if nonplanar))
-    layer_height: (u32, u32),
+    layer_height: (Microns, Microns),
 }
 
 impl Default for PrintMetadata {
@@ -81,7 +84,7 @@ impl Default for PrintMetadata {
             relative_xyz: false,
             preprint: 0..=0,
             postprint: 0..=0,
-            layer_height: (0, 0),
+            layer_height: (Microns::ZERO, Microns::ZERO),
         }
     }
 }

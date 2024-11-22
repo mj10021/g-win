@@ -14,8 +14,8 @@ impl fmt::Display for Command {
                 let mut out = String::from("G1 ");
                 let params = vec![('X', x), ('Y', y), ('Z', z), ('E', e), ('F', feed)];
                 for (letter, param) in params {
-                    if !param.is_empty() {
-                        out += format!("{}{} ", letter, param).as_str();
+                    if param.is_some() {
+                        out += format!("{}{} ", letter, param.unwrap()).as_str();
                     }
                 }
                 write!(f, "{}", out.trim())
