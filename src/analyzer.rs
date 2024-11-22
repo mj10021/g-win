@@ -3,10 +3,10 @@ use std::ops::RangeInclusive;
 use crate::microns::Microns;
 use crate::*;
 
-fn calc_slope(a: [Microns; 5], b: [Microns; 5]) -> Microns {
+fn calc_slope(a: [Microns; 5], b: [Microns; 5]) -> f32 {
     let dx = b[0] - a[0];
     let dy = b[1] - a[1];
-    dy / dx
+    f32::from(dy) / f32::from(dx)
 }
 fn is_extrusion(curr: [Microns; 5], prev: [Microns; 5]) -> bool {
     if curr[3] > Microns::ZERO {
@@ -166,7 +166,7 @@ impl<'a> Cursor<'a> {
             let mut slope = calc_slope(shape_positions[0], shape_positions[1]).abs();
             for i in 2..shape_positions.len() {
                 let slope_i = calc_slope(shape_positions[i - 1], shape_positions[i]).abs();
-                if (slope - slope_i).abs() > Microns::ZERO {
+                if (slope - slope_i).abs() > f32::EPSILON {
                     return false;
                 }
                 slope = slope_i;
@@ -286,13 +286,13 @@ fn slope_test() {
     }
     let a = hack([0.0, 0.0, 0.0, 0.0, 0.0]);
     let b = hack([1.0, 1.0, 0.0, 0.0, 0.0]);
-    assert_eq!(calc_slope(a, b), Microns::from(1.0));
+    assert_eq!(calc_slope(a, b), 1.0);
     let a = hack([0.0, 0.0, 0.0, 0.0, 0.0]);
     let b = hack([1.0, 0.0, 0.0, 0.0, 0.0]);
-    assert_eq!(calc_slope(a, b), Microns::from(0.0));
+    assert_eq!(calc_slope(a, b), 0.0);
     let a = hack([0.0, 0.0, 0.0, 0.0, 0.0]);
     let b = hack([10.0, 1.0, 0.0, 0.0, 0.0]);
-    assert_eq!(calc_slope(a, b), Microns::from(0.10));
+    assert_eq!(calc_slope(a, b), 0.10);
 }
 
 #[test]

@@ -34,7 +34,7 @@ impl std::str::FromStr for Microns {
 impl std::ops::Sub for Microns {
     type Output = Microns;
     fn sub(self, rhs: Microns) -> Microns {
-        Microns(self.0 - rhs.0)
+        Microns(self.0.saturating_sub(rhs.0))
     }
 }
 
