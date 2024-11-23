@@ -12,8 +12,9 @@ fn write_to_file_test() {
     let gcode = "G1 X1 Y2 Z3 E4 F5\nG1 X1 Y2 Z3 E4 F5\nG1 X1 Y2 Z3 E4 F5\n";
     let gcode_model: GCodeModel = gcode.parse().unwrap();
     let path = test_gcode_path().join("output").join("test_write.gcode");
-    gcode_model.write_to_file(&path).unwrap();
-    let gcode = GCodeModel::from_file(&path).unwrap();
+    let output = gcode_model.to_string();
+    std::fs::write(path.as_path(), output).unwrap();
+    let gcode = GCodeModel::try_from(path.as_path()).unwrap();
     assert_eq!(gcode.lines.len(), 3);
 }
 
@@ -22,14 +23,14 @@ fn integration_test() {
     // FIXME: this always passes
     let input = test_gcode_path().join("test.gcode");
     let output = test_gcode_path().join("output").join("test_output.gcode");
-    let gcode = GCodeModel::from_file(&input).unwrap();
+    let gcode = GCodeModel::try_from(input.as_path()).unwrap();
     assert!(!gcode.rel_xyz);
     assert!(gcode.rel_e);
     use std::fs::File;
     use std::io::Write;
     let mut f = File::create(output.clone()).unwrap();
     f.write_all(gcode.to_string().as_bytes()).unwrap();
-    let gcode2 = GCodeModel::from_file(&output).unwrap();
+    let gcode2 = GCodeModel::try_from(output.as_path()).unwrap();
     let (lines_a, lines_b) = (gcode.lines, gcode2.lines);
     // take a diff of both files
     let set_a = lines_a.iter().collect::<std::collections::HashSet<_>>();

@@ -14,23 +14,6 @@ use std::{io::Write, path::Path};
 
 pub use microns::Microns;
 
-// check that path is to a file with the correct extension and read to String
-fn open_gcode_file(path: &Path) -> Result<String, Box<dyn std::error::Error>> {
-    // check path extension
-    if let Some(extension) = path.extension().and_then(|ext| ext.to_str()) {
-        match extension {
-            "gcode" => return Ok(String::from_utf8(std::fs::read(path)?)?),
-            _ => return Err(Box::from(format!("invalid file extension: {}", extension))),
-        }
-    }
-    Err(Box::from("unable to parse file extension"))
-}
-
-#[test]
-fn open_gcode_file_test() {
-    let path = Path::new("src/tests/test.gcode");
-    let _ = open_gcode_file(path).unwrap();
-}
 
 /// Represent all possible gcode commands that we would
 /// like to handle, leaving any unknown commands as raw strings.
@@ -130,16 +113,14 @@ impl std::str::FromStr for GCodeModel {
     }
 }
 
-impl GCodeModel {
-    pub fn from_file(path: &Path) -> Result<Self, Box<dyn std::error::Error>> {
-        Ok(open_gcode_file(path)?.parse()?)
-    }
-    pub fn write_to_file(&self, path: &Path) -> Result<(), std::io::Error> {
-        use std::fs::File;
-        let out = self.to_string();
-        let mut f = File::create(path)?;
-        f.write_all(out.as_bytes())?;
-        println!("save successful");
-        Ok(())
+impl TryFrom<&Path> for GCodeModel {
+    type Error = Box<dyn std::error::Error>;
+    fn try_from(path: &Path) -> Result<Self, Self::Error> {
+        if let Some(extension) = path.extension().and_then(|ext| ext.to_str()) {
+            if extension == "gcode" {
+                return Ok(String::from_utf8(std::fs::read(path)?)?.parse()?);
+            }
+        }
+        Err("Invalid file extension".into())
     }
 }
