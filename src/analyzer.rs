@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::ops::RangeInclusive;
 
 use crate::microns::Microns;
@@ -76,7 +77,12 @@ impl<'a> Cursor<'a> {
             _ => self.state,
         }
     }
-
+    fn peek_next(&self) -> Result<&'a Command, CursorError> {
+        if self.idx == self.parent.lines.len() - 1 {
+            return Err(CursorError::EndOfFile);
+        }
+        Ok(&self.parent.lines[self.idx + 1].command)
+    }
     fn next(&mut self) -> Result<[Microns; 5], CursorError> {
         // attempt to move the cursor to the next line
         // and return the line number if successful
@@ -90,6 +96,12 @@ impl<'a> Cursor<'a> {
         Ok(self.state)
     }
 
+    fn peek_prev(&self) -> Result<&'a Command, CursorError> {
+        if self.idx == 0 {
+            return Err(CursorError::StartOfFile);
+        }
+        Ok(&self.parent.lines[self.idx - 1].command)
+    }
     fn prev(&mut self) -> Result<&'a Command, CursorError> {
         // attempt to move the cursor to the previous line
         // and return the line number if successful
@@ -111,27 +123,21 @@ impl<'a> Cursor<'a> {
     }
 
     fn next_shape(&mut self) -> RangeInclusive<usize> {
-        // keep moving the cursor until a non exstrusion G1 is found if
-        // starting from an extrusion, or until an extrusion is found if
-        // starting from a non extrusion
+
         let start = self.idx;
-        let mut end = self.idx;
-        if self.idx == self.parent.lines.len() - 1 {
-            return start..=end;
-        }
 
         let init_state = is_extrusion(self.state, self.prev);
         let mut prev = self.state;
-        while init_state != is_extrusion(self.state, prev) && self.next().is_ok() {
-            end = self.idx;
+        while self.peek_next().is_ok() {
+            let _ = self.next();
+            let curr_state = is_extrusion(self.state, prev);
+            if curr_state != init_state {
+                let _ = self.prev();
+                break;
+            }
             prev = self.state;
         }
-
-        if self.idx != self.parent.lines.len() - 1 {
-            let _ = self.prev();
-        }
-
-        start..=end
+        start..=self.idx
     }
 
     fn at_first_extrusion(&self) -> bool {
@@ -187,12 +193,17 @@ impl<'a> Cursor<'a> {
     }
 
     fn shapes(&mut self) -> Vec<RangeInclusive<usize>> {
-        let mut shapes = Vec::new();
+        let mut shapes = vec![self.next_shape()];
         self.reset();
-        while self.idx < self.parent.lines.len() - 1 {
-            shapes.push(self.next_shape());
+        while self.peek_next().is_ok() {
+            let _ = self.next();
+            let shape = self.next_shape();
+            if shapes.contains(&shape) {
+                break;
+            }
+            shapes.push(shape);
         }
-        shapes
+        shapes.into_iter().collect()
     }
 
     pub fn pre_print(&mut self) -> Result<RangeInclusive<usize>, &'static str> {

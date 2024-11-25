@@ -84,6 +84,7 @@ impl From<&GCodeModel> for PrintMetadata {
         }
     }
 }
+
 /// Store all information for a .gcode file,
 /// specifically calling out relative vs absolute positioning
 /// and extrusion and with a counter to generate line ids
@@ -104,7 +105,7 @@ impl std::str::FromStr for GCodeModel {
         let gcode = parsers::gcode_parser(&mut s);
         match gcode {
             Ok(mut gcode) => {
-                let metadata = PrintMetadata::from(&gcode);
+                let metadata = PrintMetadata::default();//from(&gcode);
                 gcode.metadata = metadata;
                 Ok(gcode)
             }
