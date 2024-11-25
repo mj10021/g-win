@@ -33,7 +33,7 @@
 ## Design
 
   
-
+-  **Minimal Config** No printer information is required to parse and interpret the gcode
 
 -  **Preserves Unrecognized Commands:** Stores any unrecognized or custom commands as strings in place.
 
