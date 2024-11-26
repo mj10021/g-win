@@ -1,14 +1,8 @@
-use std::collections::HashSet;
 use std::ops::RangeInclusive;
 
 use crate::microns::Microns;
 use crate::*;
 
-fn calc_slope(a: [Microns; 5], b: [Microns; 5]) -> f32 {
-    let dx = b[0] - a[0];
-    let dy = b[1] - a[1];
-    f32::from(dy) / f32::from(dx)
-}
 fn is_extrusion(curr: [Microns; 5], prev: [Microns; 5]) -> bool {
     if curr[3] > Microns::ZERO {
         return (curr[0] - prev[0]).abs() > Microns::ZERO
@@ -151,47 +145,6 @@ impl<'a> Cursor<'a> {
         true
     }
 
-    fn is_purge_line(&mut self, lines: RangeInclusive<usize>) -> bool {
-        // determining what is a purge line based on
-        //     1) is it the first extrusion of the print
-        //     2) is it outside of the print area
-        //     3) can you fit the shape to a line
-        let start = lines.start();
-        let mut cur = self.child_at(*start);
-        if !cur.at_first_extrusion() {
-            return false;
-        }
-        let mut init = cur.state;
-        let mut shape_positions = Vec::new();
-        // load all the shape positions into a vec while
-        // checking if any extrusions are inside the main print area
-        while cur.next().is_ok() {
-            if is_extrusion(init, cur.state) {
-                shape_positions.push(cur.state);
-                if cur.state[0] > Microns::from(2.0) && cur.state[1] > Microns::from(2.0) {
-                    return false;
-                }
-            }
-            init = cur.state;
-        }
-        // now if there are 3 or more points in the shape,
-        // check if they are in a line by making sure the
-        // slope (abs) is the same for every move
-
-        if shape_positions.len() > 2 {
-            let mut slope = calc_slope(shape_positions[0], shape_positions[1]).abs();
-            for i in 2..shape_positions.len() {
-                let slope_i = calc_slope(shape_positions[i - 1], shape_positions[i]).abs();
-                if (slope - slope_i).abs() > f32::EPSILON {
-                    return false;
-                }
-                slope = slope_i;
-            }
-        }
-
-        true
-    }
-
     fn shapes(&mut self) -> Vec<RangeInclusive<usize>> {
         let mut shapes = vec![self.next_shape()];
         self.reset();
@@ -206,29 +159,6 @@ impl<'a> Cursor<'a> {
         shapes.into_iter().collect()
     }
 
-    pub fn pre_print(&mut self) -> Result<RangeInclusive<usize>, &'static str> {
-        let mut shapes = self.shapes();
-        shapes.reverse();
-        if let Some(first) = shapes.pop() {
-            if !self.is_purge_line(first.clone()) {
-                return Ok(RangeInclusive::new(0, first.start().saturating_sub(1)));
-            } else if let Some(second) = shapes.pop() {
-                return Ok(RangeInclusive::new(0, second.start().saturating_sub(1)));
-            }
-        }
-        Err("No preprint found")
-    }
-
-    pub fn post_print(&mut self) -> Result<RangeInclusive<usize>, &'static str> {
-        let mut shapes = self.shapes();
-        if let Some(range_inclusive) = shapes.pop() {
-            return Ok(RangeInclusive::new(
-                range_inclusive.end() + 1,
-                self.parent.lines.len() - 1,
-            ));
-        }
-        Err("No postprint found")
-    }
     fn nonplanar_extrusion(&self, prev: [Microns; 5]) -> bool {
         let [_dx, _dy, dz, _de, _df] = self
             .state
@@ -244,6 +174,7 @@ impl<'a> Cursor<'a> {
         }
         false
     }
+
     pub fn is_planar(&mut self) -> bool {
         let mut init = self.state;
         while self.next().is_ok() {
@@ -295,27 +226,6 @@ impl<'a> Cursor<'a> {
     }
 }
 
-#[cfg(test)]
-#[test]
-fn slope_test() {
-    fn hack(x: [f32; 5]) -> [Microns; 5] {
-        x.iter()
-            .map(|&x| Microns::from(x))
-            .collect::<Vec<Microns>>()
-            .try_into()
-            .unwrap()
-    }
-    let a = hack([0.0, 0.0, 0.0, 0.0, 0.0]);
-    let b = hack([1.0, 1.0, 0.0, 0.0, 0.0]);
-    assert_eq!(calc_slope(a, b), 1.0);
-    let a = hack([0.0, 0.0, 0.0, 0.0, 0.0]);
-    let b = hack([1.0, 0.0, 0.0, 0.0, 0.0]);
-    assert_eq!(calc_slope(a, b), 0.0);
-    let a = hack([0.0, 0.0, 0.0, 0.0, 0.0]);
-    let b = hack([10.0, 1.0, 0.0, 0.0, 0.0]);
-    assert_eq!(calc_slope(a, b), 0.10);
-}
-
 #[test]
 fn is_extrusion_test() {
     let tests = [
@@ -353,6 +263,24 @@ fn is_extrusion_test() {
 }
 
 #[test]
+fn string_extrusion_test() {
+    let test = "
+    \n G1 X0 Y0 Z0
+    \n G1 Z0.2 E1
+    \n G1 X50 Y100 E12.222 
+    \n G1 X0.01 E0.01".trim();
+    let model: GCodeModel = test.parse().unwrap();
+    let mut cursor = Cursor::from(&model);
+    let mut init = cursor.state;
+    while cursor.next().is_ok() {
+        if !is_extrusion(cursor.state, init) {
+            panic!("fail");
+        }
+        init = cursor.state;
+    }
+}
+
+#[test]
 fn planar_test() {
     use crate::tests;
     let model = GCodeModel::try_from(tests::test_gcode_path().join("test.gcode").as_path()).unwrap();
@@ -360,13 +288,6 @@ fn planar_test() {
     assert!(cursor.is_planar());
 }
 
-#[test]
-fn preprint_test() {
-    let model = GCodeModel::try_from(tests::test_gcode_path().join("test.gcode").as_path()).unwrap();
-    let mut cursor = Cursor::from(&model);
-    let range = cursor.pre_print();
-    assert_eq!(range, Ok(0..=100));
-}
 
 #[test]
 fn test_cursor() {
@@ -404,23 +325,38 @@ fn alt_shape_test() {
     }
 }
 #[test]
+fn initial_shape_test() {
+    let init: GCodeModel = "
+    G1 Z3 F900\n
+        G1 X0 Y-1\n
+        G1 X50 Y-1 E25\n
+        G1 X25 E10\n
+    ".trim().parse().unwrap();
+    let mut cursor = Cursor::from(&init);
+    let next = cursor.next_shape();
+    assert_eq!(next, 0..=1);
+}
+
+#[test]
 fn shape_test() {
     let test_gcode = "
-        G1 Z3 F900
-        G1 X0 Y-1
-        G1 X50 Y-1 E25
-        G1 X25 E10
-        G1 E-1.5
-        G1 Z1
-        G1 X50 Y50
-        G1 Z0.2 E1
-        G1 X50 Y100 E12.222 
-    ";
+        \n G1 Z3 F900
+        \n G1 X0 Y-1
+        \n G1 X50 Y-1 E25
+        \n G1 X25 E10
+        \n G1 E-1.5
+        \n G1 Z1
+        \n G1 X50 Y50
+        \n G1 Z0.2 E1
+        \n G1 X50 Y100 E12.222 
+    ".trim();
     let model: GCodeModel = test_gcode.parse().unwrap();
     let mut cursor = Cursor::from(&model);
-    let expected_results = [0..=1, 2..=3, 4..=7, 8..=8];
+    panic!("{:?}", cursor.shapes());
+    let expected_results = [0..=1, 2..=3, 4..=6, 7..=8];
     for expected in expected_results.iter() {
         let next = cursor.next_shape();
+        let _ = cursor.next();
         assert_eq!(next, expected.clone());
     }
     let shapes = cursor.shapes();

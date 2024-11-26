@@ -10,7 +10,7 @@ mod tests;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use std::{io::Write, path::Path};
+use std::path::Path;
 
 pub use microns::Microns;
 
@@ -54,8 +54,6 @@ pub struct GCodeLine {
 pub struct PrintMetadata {
     relative_e: bool,
     relative_xyz: bool,
-    preprint: std::ops::RangeInclusive<usize>,
-    postprint: std::ops::RangeInclusive<usize>,
     /// micrometers (first layer, rest of layers((0, 0) if nonplanar))
     layer_height: (Microns, Microns),
 }
@@ -65,8 +63,6 @@ impl Default for PrintMetadata {
         PrintMetadata {
             relative_e: false,
             relative_xyz: false,
-            preprint: 0..=0,
-            postprint: 0..=0,
             layer_height: (Microns::ZERO, Microns::ZERO),
         }
     }
@@ -76,8 +72,6 @@ impl From<&GCodeModel> for PrintMetadata {
     fn from(gcode: &GCodeModel) -> Self {
         let mut cursor = analyzer::Cursor::from(gcode);
         PrintMetadata {
-            preprint: cursor.pre_print().unwrap_or(0..=0),
-            postprint: cursor.post_print().unwrap_or(0..=0),
             relative_e: gcode.rel_e,
             relative_xyz: gcode.rel_xyz,
             layer_height: cursor.layer_height(),
