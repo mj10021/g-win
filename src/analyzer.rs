@@ -1,22 +1,13 @@
 use std::ops::RangeInclusive;
 
-use crate::microns::Microns;
+use crate::microns::*;
 use crate::*;
-
-fn is_extrusion(curr: [Microns; 5], prev: [Microns; 5]) -> bool {
-    if curr[3] > Microns::ZERO {
-        return (curr[0] - prev[0]).abs() > Microns::ZERO
-            || (curr[1] - prev[1]).abs() > Microns::ZERO
-            || (curr[2] - prev[2]).abs() > Microns::ZERO;
-    }
-    false
-}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum CursorError {
     StartOfFile,
     EndOfFile,
-} 
+}
 
 impl std::fmt::Display for CursorError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -53,19 +44,33 @@ impl<'a> From<&'a GCodeModel> for Cursor<'a> {
 impl<'a> Cursor<'a> {
     fn reset(&mut self) {
         self.idx = 0;
-        self.update();
+        self.prev = [Microns::MIN; 5];
+        let line = self.parent.lines.get(self.idx).unwrap();
+        self.curr_command = &line.command;
+        self.state = match self.curr_command {
+            Command::G1 { x, y, z, e, f } => [
+                x.unwrap_or(self.prev.x()),
+                y.unwrap_or(self.prev.y()),
+                z.unwrap_or(self.prev.z()),
+                e.unwrap_or(self.prev.e()),
+                f.unwrap_or(self.prev.f()),
+            ],
+            Command::Home(_) => [Microns::ZERO; 5],
+            _ => [Microns::MIN; 5],
+        }
     }
 
     fn update(&mut self) {
         let line = self.parent.lines.get(self.idx).unwrap();
         self.curr_command = &line.command;
+        self.prev = self.state;
         self.state = match self.curr_command {
             Command::G1 { x, y, z, e, f } => [
-                x.unwrap_or(self.state[0]),
-                y.unwrap_or(self.state[1]),
-                z.unwrap_or(self.state[2]),
-                e.unwrap_or(self.state[3]),
-                f.unwrap_or(self.state[4]),
+                x.unwrap_or(self.state.x()),
+                y.unwrap_or(self.state.y()),
+                z.unwrap_or(self.state.z()),
+                e.unwrap_or(self.state.e()),
+                f.unwrap_or(self.state.f()),
             ],
             Command::Home(_) => [Microns::ZERO; 5],
             _ => self.state,
@@ -117,28 +122,31 @@ impl<'a> Cursor<'a> {
     }
 
     fn next_shape(&mut self) -> RangeInclusive<usize> {
-
         let start = self.idx;
 
-        let init_state = is_extrusion(self.state, self.prev);
-        let mut prev = self.state;
+        let init_state = self.is_extrusion();
         while self.peek_next().is_ok() {
             let _ = self.next();
-            let curr_state = is_extrusion(self.state, prev);
-            if curr_state != init_state {
+            if init_state != self.is_extrusion() {
                 let _ = self.prev();
                 break;
             }
-            prev = self.state;
         }
         start..=self.idx
     }
-
+    fn is_extrusion(&self) -> bool {
+        let (curr, prev) = (self.state, self.prev);
+        if curr[3] > Microns::ZERO {
+            return (curr.x() - prev.x()).abs() > Microns::ZERO
+                || (curr.y() - prev.y()).abs() > Microns::ZERO
+                || (curr.z() - prev.z()).abs() > Microns::ZERO;
+        }
+        false
+    }
     fn at_first_extrusion(&self) -> bool {
         let mut temp_cursor = *self;
-        let curr = temp_cursor.state;
         while temp_cursor.prev().is_ok() {
-            if is_extrusion(curr, temp_cursor.state) {
+            if !self.is_extrusion() {
                 return false;
             }
         }
@@ -146,17 +154,13 @@ impl<'a> Cursor<'a> {
     }
 
     fn shapes(&mut self) -> Vec<RangeInclusive<usize>> {
-        let mut shapes = vec![self.next_shape()];
         self.reset();
+        let mut shapes = vec![self.next_shape()];
         while self.peek_next().is_ok() {
             let _ = self.next();
-            let shape = self.next_shape();
-            if shapes.contains(&shape) {
-                break;
-            }
-            shapes.push(shape);
+            shapes.push(self.next_shape());
         }
-        shapes.into_iter().collect()
+        shapes
     }
 
     fn nonplanar_extrusion(&self, prev: [Microns; 5]) -> bool {
@@ -168,8 +172,7 @@ impl<'a> Cursor<'a> {
             .collect::<Vec<Microns>>()
             .try_into()
             .unwrap();
-        if let Command::G1 { e: Some(e), .. } = self.curr_command
-        {
+        if let Command::G1 { e: Some(e), .. } = self.curr_command {
             return *e > Microns::ZERO && dz.abs() > Microns::ZERO;
         }
         false
@@ -193,7 +196,7 @@ impl<'a> Cursor<'a> {
             return (Microns::ZERO, Microns::ZERO);
         }
         while self.next().is_ok() {
-            if is_extrusion(self.state, init) {
+            if self.is_extrusion() {
                 heights.push(self.state[2]);
             }
             init = self.state;
@@ -227,71 +230,35 @@ impl<'a> Cursor<'a> {
 }
 
 #[test]
-fn is_extrusion_test() {
-    let tests = [
-        ([0.0, 0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0], false),
-        ([0.0, 0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 0.0, 0.0], false),
-        ([0.0, 1.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0, 0.0], true),
-        ([0.0, 1.0, 0.0, 1.0, 0.0], [1.0, 1.0, 0.0, 1.0, 0.0], true),
-        (
-            [50.0, -1.0, 3.0, 25.0, 900.0],
-            [0.0, -1.0, 3.0, 100.0, 900.0],
-            true,
-        ),
-    ];
-    let tests = tests
-        .iter()
-        .map(|(curr, prev, expected)| {
-            (
-                curr.iter()
-                    .map(|&x| Microns::from(x))
-                    .collect::<Vec<Microns>>()
-                    .try_into()
-                    .unwrap(),
-                prev.iter()
-                    .map(|&x| Microns::from(x))
-                    .collect::<Vec<Microns>>()
-                    .try_into()
-                    .unwrap(),
-                *expected,
-            )
-        })
-        .collect::<Vec<([Microns; 5], [Microns; 5], bool)>>();
-    for (curr, prev, expected) in tests.iter() {
-        assert_eq!(is_extrusion(*curr, *prev), *expected);
-    }
-}
-
-#[test]
 fn string_extrusion_test() {
     let test = "
     \n G1 X0 Y0 Z0
     \n G1 Z0.2 E1
     \n G1 X50 Y100 E12.222 
-    \n G1 X0.01 E0.01".trim();
+    \n G1 X0.01 E0.01"
+        .trim();
     let model: GCodeModel = test.parse().unwrap();
     let mut cursor = Cursor::from(&model);
-    let mut init = cursor.state;
     while cursor.next().is_ok() {
-        if !is_extrusion(cursor.state, init) {
+        if !cursor.is_extrusion() {
             panic!("fail");
         }
-        init = cursor.state;
     }
 }
 
 #[test]
 fn planar_test() {
     use crate::tests;
-    let model = GCodeModel::try_from(tests::test_gcode_path().join("test.gcode").as_path()).unwrap();
+    let model =
+        GCodeModel::try_from(tests::test_gcode_path().join("test.gcode").as_path()).unwrap();
     let mut cursor = Cursor::from(&model);
     assert!(cursor.is_planar());
 }
 
-
 #[test]
 fn test_cursor() {
-    let model = GCodeModel::try_from(tests::test_gcode_path().join("test.gcode").as_path()).unwrap();
+    let model =
+        GCodeModel::try_from(tests::test_gcode_path().join("test.gcode").as_path()).unwrap();
     //let mut cursor = Cursor::from(&model);
     //assert_eq!(cursor.idx, 0);
     // for i in 0..100 {
@@ -331,14 +298,32 @@ fn initial_shape_test() {
         G1 X0 Y-1\n
         G1 X50 Y-1 E25\n
         G1 X25 E10\n
-    ".trim().parse().unwrap();
+    "
+    .trim()
+    .parse()
+    .unwrap();
     let mut cursor = Cursor::from(&init);
     let next = cursor.next_shape();
     assert_eq!(next, 0..=1);
 }
 
 #[test]
+fn another_extrusion_test() {
+    let test = "\n G1 X50 Y50
+        \n G1 Z0.2 E1";
+    let model: GCodeModel = test.parse().unwrap();
+    let mut cursor = Cursor::from(&model);
+    assert!(!cursor.is_extrusion());
+    cursor.next().unwrap();
+    assert!(cursor.is_extrusion());
+}
+
+#[test]
 fn shape_test() {
+    let test: GCodeModel = "G1".parse().unwrap();
+    let mut cursor = Cursor::from(&test);
+    assert_eq!(cursor.next_shape(), 0..=0);
+
     let test_gcode = "
         \n G1 Z3 F900
         \n G1 X0 Y-1
@@ -348,17 +333,12 @@ fn shape_test() {
         \n G1 Z1
         \n G1 X50 Y50
         \n G1 Z0.2 E1
-        \n G1 X50 Y100 E12.222 
-    ".trim();
+        \n G1 X50 Y100 E12.222
+        \n G1 Z0.01
+    "
+    .trim();
     let model: GCodeModel = test_gcode.parse().unwrap();
     let mut cursor = Cursor::from(&model);
-    panic!("{:?}", cursor.shapes());
-    let expected_results = [0..=1, 2..=3, 4..=6, 7..=8];
-    for expected in expected_results.iter() {
-        let next = cursor.next_shape();
-        let _ = cursor.next();
-        assert_eq!(next, expected.clone());
-    }
     let shapes = cursor.shapes();
-    assert_eq!(shapes, vec![0..=1, 2..=3, 4..=7, 8..=8]);
+    assert_eq!(shapes, vec![0..=1, 2..=3, 4..=6, 7..=8, 9..=9]);
 }

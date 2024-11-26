@@ -14,7 +14,6 @@ use std::path::Path;
 
 pub use microns::Microns;
 
-
 /// Represent all possible gcode commands that we would
 /// like to handle, leaving any unknown commands as raw strings.
 /// Specific structs to store information for each command can
@@ -99,7 +98,7 @@ impl std::str::FromStr for GCodeModel {
         let gcode = parsers::gcode_parser(&mut s);
         match gcode {
             Ok(mut gcode) => {
-                let metadata = PrintMetadata::default();//from(&gcode);
+                let metadata = PrintMetadata::default(); //from(&gcode);
                 gcode.metadata = metadata;
                 Ok(gcode)
             }

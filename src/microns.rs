@@ -66,3 +66,40 @@ impl std::fmt::Display for Microns {
         write!(f, "{}", self.0 as f32)
     }
 }
+
+#[test]
+fn math_test() {
+    let a = Microns(1000);
+    let b = Microns(2000);
+    assert_eq!(a + b, Microns(3000));
+    assert_eq!((Microns(2)*a) - b, Microns::ZERO);
+    assert_eq!(a * b, Microns(2000000));
+    assert_eq!(b / a, Microns(2));
+}
+
+pub trait State {
+    fn x(&self) -> Microns;
+    fn y(&self) -> Microns;
+    fn z(&self) -> Microns;
+    fn e(&self) -> Microns;
+    fn f(&self) -> Microns;
+}
+
+impl State for [Microns; 5] {
+    fn x(&self) -> Microns {
+        self[0]
+    }
+    fn y(&self) -> Microns {
+        self[1]
+    }
+    fn z(&self) -> Microns {
+        self[2]
+    }
+    fn e(&self) -> Microns {
+        self[3]
+    }
+    fn f(&self) -> Microns {
+        self[4]
+    }
+}
+

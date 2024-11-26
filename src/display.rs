@@ -14,13 +14,17 @@ impl fmt::Display for Command {
                 let mut out = String::from("G1 ");
                 let params = vec![('X', x), ('Y', y), ('Z', z), ('E', e), ('F', feed)];
                 for (letter, param) in params {
-                    if let Some(param) = param  {
+                    if let Some(param) = param {
                         let param = {
                             if param.0 % 1000 == 0 {
                                 format!("{}", *param / Microns(1000))
                             } else {
                                 let param: f32 = (*param).into();
-                                String::from(format!("{:.3}", param).trim_end_matches('0').trim_end_matches('.'))
+                                String::from(
+                                    format!("{:.3}", param)
+                                        .trim_end_matches('0')
+                                        .trim_end_matches('.'),
+                                )
                             }
                             //format!("{:.3}", param);
                         };
@@ -58,30 +62,40 @@ impl Display for GCodeModel {
 }
 
 #[cfg(test)]
-
 #[test]
 fn g1_tests() {
-    let g1 = [(Command::G1 {
-        x: Some(Microns(1000)),
-        y: Some(Microns(2000)),
-        z: Some(Microns(3000)),
-        e: Some(Microns(11)),
-        f: Some(Microns(5500)),
-    }, "G1 X1 Y2 Z3 E0.011 F5.5"),
-    (Command::G1 {
-        x: None,
-        y: None,
-        z: None,
-        e: None,
-        f: None,
-    }, "G1"),
-    (Command::G1 {
-        x: Some(Microns(1111111)),
-        y: None,
-        z: None,
-        e: None,
-        f: Some(Microns(-1111111)),
-    }, "G1 X1111.111 F-1111.111")];
+    let g1 = [
+        (
+            Command::G1 {
+                x: Some(Microns(1000)),
+                y: Some(Microns(2000)),
+                z: Some(Microns(3000)),
+                e: Some(Microns(11)),
+                f: Some(Microns(5500)),
+            },
+            "G1 X1 Y2 Z3 E0.011 F5.5",
+        ),
+        (
+            Command::G1 {
+                x: None,
+                y: None,
+                z: None,
+                e: None,
+                f: None,
+            },
+            "G1",
+        ),
+        (
+            Command::G1 {
+                x: Some(Microns(1111111)),
+                y: None,
+                z: None,
+                e: None,
+                f: Some(Microns(-1111111)),
+            },
+            "G1 X1111.111 F-1111.111",
+        ),
+    ];
     for (cmd, expected) in g1 {
         assert_eq!(cmd.to_string(), expected);
     }
@@ -94,7 +108,7 @@ fn parse_emit_test() {
         "M666\n",
         "UNKNOWN_MACRO\n",
         "special command\n",
-        "T0 11\n"
+        "T0 11\n",
     ];
     for test in tests.iter() {
         let model: GCodeModel = test.parse().unwrap();
