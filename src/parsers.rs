@@ -1,30 +1,25 @@
 use crate::*;
 use winnow::{
     ascii::multispace1,
-    combinator::{rest, separated_pair},
+    combinator::{alt, repeat, rest, separated_pair},
     error::InputError,
     token::{one_of, take, take_till, take_while},
     PResult, Parser,
 };
 
 /// parse a line until '\n' or '\r' and then clear all following whitespace
-fn parse_line<'a>(input: &mut &'a str) -> PResult<&'a str> {
+fn parse_line_text<'a>(input: &mut &'a str) -> PResult<&'a str> {
     // this must always consume at least one character
-    let line = take_till(0.., |c| c == '\n' || c == '\r').parse_next(input)?;
-    let _: PResult<&str> = multispace1.parse_next(input);
-    Ok(line)
+    take_till(0.., |c| c == '\n' || c == '\r').parse_next(input)
+}
+
+fn parse_line<'a>(input: &mut &'a str) -> PResult<(&'a str, &'a str)>  {
+    (parse_line_text, multispace1).parse_next(input)
 }
 
 /// repeat the parse_line fn until the input is empty and collect to Vec
-fn parse_lines<'a>(input: &mut &'a str) -> PResult<Vec<&'a str>> {
-    let mut out = Vec::new();
-    loop {
-        if input.is_empty() {
-            break;
-        }
-        out.push(parse_line.parse_next(input)?);
-    }
-    Ok(out)
+fn parse_lines<'a>(input: &mut &'a str) -> PResult<Vec<(&'a str, &'a str)>> {
+    repeat(1.., parse_line).parse_next(input)
 }
 
 /// parse the first word of a line by taking the first char
@@ -120,7 +115,7 @@ impl std::fmt::Display for GCodeParseError {
 impl std::error::Error for GCodeParseError {}
 
 /// Outermost parser for gcode files
-pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
+pub fn parse_gcode(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
     let mut gcode = GCodeModel::default();
     let lines = parse_lines
         .parse(input)
@@ -154,19 +149,15 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
             }
             Ok(("G", "28", _)) => Command::Home(string_copy),
             Ok(("G", "90", _)) => {
-                gcode.rel_xyz = false;
                 Command::G90
             }
             Ok(("G", "91", _)) => {
-                gcode.rel_xyz = true;
                 Command::G91
             }
             Ok(("M", "82", _)) => {
-                gcode.rel_e = false;
                 Command::M82
             }
             Ok(("M", "83", _)) => {
-                gcode.rel_e = true;
                 Command::M83
             }
             _ => Command::Raw(string_copy),
@@ -179,22 +170,26 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
     Ok(gcode)
 }
 
+fn parse_file(input: &mut &'a str) -> Result<GCodeModel, Box<dyn std::error::Error>> {
+    let mut input = input;
+    parse_gcode(&mut input)
+}
+
+
 #[test]
-fn gcode_parser_test() {
+fn parse_gcode_test() {
     let input = "G1 X1.0 Y2.0 Z3.0 E4.0 F5.0;hello world\nG28 W ; hello world\nG90; hello world\nG91; hello world\nM82\n; asdf".to_string();
     let mut input = input.as_str();
-    let result = gcode_parser(&mut input).unwrap();
+    let result = parse_gcode(&mut input).unwrap();
     let expected = GCodeModel {
-        rel_xyz: true,
-        rel_e: false,
         lines: vec![
             GCodeLine {
                 command: Command::G1 {
-                    x: Some(Microns::from(1.0)),
-                    y: Some(Microns::from(2.0)),
-                    z: Some(Microns::from(3.0)),
-                    e: Some(Microns::from(4.0)),
-                    f: Some(Microns::from(5.0)),
+                    x: Some(Microns::try_from(1.0).unwrap()),
+                    y: Some(Microns::try_from(2.0).unwrap()),
+                    z: Some(Microns::try_from(3.0).unwrap()),
+                    e: Some(Microns::try_from(4.0).unwrap()),
+                    f: Some(Microns::try_from(5.0).unwrap()),
                 },
                 comments: String::from("hello world"),
             },
@@ -263,6 +258,7 @@ fn parse_lines_test() {
         assert_eq!(result, *expected);
     }
 }
+
 #[test]
 fn parse_word_test() {
     let tests = [

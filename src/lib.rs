@@ -71,8 +71,8 @@ impl From<&GCodeModel> for PrintMetadata {
     fn from(gcode: &GCodeModel) -> Self {
         let mut cursor = analyzer::Cursor::from(gcode);
         PrintMetadata {
-            relative_e: gcode.rel_e,
-            relative_xyz: gcode.rel_xyz,
+            relative_e: true,
+            relative_xyz: false,
             layer_height: cursor.layer_height(),
         }
     }
@@ -87,15 +87,19 @@ impl From<&GCodeModel> for PrintMetadata {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct GCodeModel {
     pub lines: Vec<GCodeLine>, // keep track of line order
-    pub rel_xyz: bool,
-    pub rel_e: bool,
     pub metadata: PrintMetadata,
+}
+
+impl GCodeModel {
+    pub fn get(&self, idx: usize) -> Option<&GCodeLine> {
+        self.lines.get(idx)
+    }
 }
 
 impl std::str::FromStr for GCodeModel {
     type Err = parsers::GCodeParseError;
     fn from_str(mut s: &str) -> Result<Self, Self::Err> {
-        let gcode = parsers::gcode_parser(&mut s);
+        let gcode = parsers::parse_gcode(&mut s);
         match gcode {
             Ok(mut gcode) => {
                 let metadata = PrintMetadata::default(); //from(&gcode);

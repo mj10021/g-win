@@ -17,7 +17,7 @@ impl fmt::Display for Command {
                     if let Some(param) = param {
                         let param = {
                             if param.0 % 1000 == 0 {
-                                format!("{}", *param / Microns(1000))
+                                format!("{}", param.0 / 1000)
                             } else {
                                 let param: f32 = (*param).into();
                                 String::from(

@@ -13,9 +13,14 @@ impl Microns {
     }
 }
 
-impl From<f32> for Microns {
-    fn from(f: f32) -> Self {
-        Microns((f * 1000.0).trunc() as i32)
+impl TryFrom<f32> for Microns {
+    type Error = &'static str;
+    fn try_from(f: f32) -> Result<Self, Self::Error> {
+        if f.is_nan() {
+            Err("NaN")
+        } else {
+            Ok(Microns((f * 1000.0).trunc() as i32))
+        }
     }
 }
 
@@ -29,7 +34,7 @@ impl std::str::FromStr for Microns {
     type Err = &'static str;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let f = s.parse::<f32>().map_err(|_| "unable to parse float")?;
-        Ok(Microns::from(f))
+        Ok(Microns::try_from(f)?)
     }
 }
 
@@ -43,41 +48,12 @@ impl std::ops::Sub for Microns {
 impl std::ops::Add for Microns {
     type Output = Microns;
     fn add(self, rhs: Microns) -> Microns {
-        Microns(self.0 + rhs.0)
+        Microns(self.0.saturating_add(rhs.0))
     }
 }
 
-impl std::ops::Div for Microns {
-    type Output = Microns;
-    fn div(self, rhs: Microns) -> Microns {
-        Microns(self.0 / rhs.0)
-    }
-}
 
-impl std::ops::Mul for Microns {
-    type Output = Microns;
-    fn mul(self, rhs: Microns) -> Microns {
-        Microns(self.0 * rhs.0)
-    }
-}
-
-impl std::fmt::Display for Microns {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.0 as f32)
-    }
-}
-
-#[test]
-fn math_test() {
-    let a = Microns(1000);
-    let b = Microns(2000);
-    assert_eq!(a + b, Microns(3000));
-    assert_eq!((Microns(2)*a) - b, Microns::ZERO);
-    assert_eq!(a * b, Microns(2000000));
-    assert_eq!(b / a, Microns(2));
-}
-
-pub trait State {
+pub trait Vec5 {
     fn x(&self) -> Microns;
     fn y(&self) -> Microns;
     fn z(&self) -> Microns;
@@ -85,7 +61,7 @@ pub trait State {
     fn f(&self) -> Microns;
 }
 
-impl State for [Microns; 5] {
+impl Vec5 for [Microns; 5] {
     fn x(&self) -> Microns {
         self[0]
     }

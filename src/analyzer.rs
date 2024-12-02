@@ -126,14 +126,15 @@ impl<'a> Cursor<'a> {
 
         let init_state = self.is_extrusion();
         while self.peek_next().is_ok() {
-            let _ = self.next();
+            self.next().unwrap();
             if init_state != self.is_extrusion() {
-                let _ = self.prev();
+                self.prev().unwrap();
                 break;
             }
         }
         start..=self.idx
     }
+
     fn is_extrusion(&self) -> bool {
         let (curr, prev) = (self.state, self.prev);
         if curr[3] > Microns::ZERO {
@@ -157,7 +158,7 @@ impl<'a> Cursor<'a> {
         self.reset();
         let mut shapes = vec![self.next_shape()];
         while self.peek_next().is_ok() {
-            let _ = self.next();
+            self.next().unwrap();
             shapes.push(self.next_shape());
         }
         shapes
