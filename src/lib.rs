@@ -7,10 +7,11 @@ pub mod microns;
 mod parsers;
 mod tests;
 
+use parsers::parse_file;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub use microns::Microns;
 
@@ -96,29 +97,9 @@ impl GCodeModel {
     }
 }
 
-impl std::str::FromStr for GCodeModel {
-    type Err = parsers::GCodeParseError;
-    fn from_str(mut s: &str) -> Result<Self, Self::Err> {
-        let gcode = parsers::parse_gcode(&mut s);
-        match gcode {
-            Ok(mut gcode) => {
-                let metadata = PrintMetadata::default(); //from(&gcode);
-                gcode.metadata = metadata;
-                Ok(gcode)
-            }
-            Err(e) => Err(e),
-        }
-    }
-}
-
-impl TryFrom<&Path> for GCodeModel {
+impl TryFrom<PathBuf> for GCodeModel {
     type Error = Box<dyn std::error::Error>;
-    fn try_from(path: &Path) -> Result<Self, Self::Error> {
-        if let Some(extension) = path.extension().and_then(|ext| ext.to_str()) {
-            if extension == "gcode" {
-                return Ok(String::from_utf8(std::fs::read(path)?)?.parse()?);
-            }
-        }
-        Err("Invalid file extension".into())
+    fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
+        parse_file(&path).map_err(|e| e.into())
     }
 }

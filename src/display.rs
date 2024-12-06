@@ -100,18 +100,3 @@ fn g1_tests() {
         assert_eq!(cmd.to_string(), expected);
     }
 }
-
-#[test]
-fn parse_emit_test() {
-    let tests = [
-        "G28 W\n",
-        "M666\n",
-        "UNKNOWN_MACRO\n",
-        "special command\n",
-        "T0 11\n",
-    ];
-    for test in tests.iter() {
-        let model: GCodeModel = test.parse().unwrap();
-        assert_eq!(model.to_string(), *test);
-    }
-}

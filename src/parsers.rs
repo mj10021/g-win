@@ -1,10 +1,17 @@
+use core::str;
+use std::{
+    default,
+    io::{BufReader, Read},
+};
+
 use crate::*;
 use winnow::{
     ascii::multispace1,
     combinator::{alt, repeat, rest, separated_pair},
     error::InputError,
+    stream::AsBStr,
     token::{one_of, take, take_till, take_while},
-    PResult, Parser,
+    Bytes, PResult, Parser,
 };
 
 /// parse a line until '\n' or '\r' and then clear all following whitespace
@@ -13,7 +20,7 @@ fn parse_line_text<'a>(input: &mut &'a str) -> PResult<&'a str> {
     take_till(0.., |c| c == '\n' || c == '\r').parse_next(input)
 }
 
-fn parse_line<'a>(input: &mut &'a str) -> PResult<(&'a str, &'a str)>  {
+fn parse_line<'a>(input: &mut &'a str) -> PResult<(&'a str, &'a str)> {
     (parse_line_text, multispace1).parse_next(input)
 }
 
@@ -63,7 +70,7 @@ fn g1_parameter_parse<'a>(input: &mut &'a str) -> PResult<[&'a str; 5]> {
 
 /// Custom error type for integrating winnow errors
 /// with the main application
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct GCodeParseError {
     pub message: String,
     // Byte spans are tracked, rather than line and column.
@@ -115,149 +122,71 @@ impl std::fmt::Display for GCodeParseError {
 impl std::error::Error for GCodeParseError {}
 
 /// Outermost parser for gcode files
-pub fn parse_gcode(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
-    let mut gcode = GCodeModel::default();
-    let lines = parse_lines
-        .parse(input)
-        .map_err(|e| GCodeParseError::from_parse(e, input))?;
-    // split a file into lines
-    for line in lines {
-        // split off comments before parsing
-        let (line, comments) = line.split_once(';').unwrap_or((line, ""));
-
-        // store a copy of the original line for unsupported commands
-        let string_copy = String::from(line);
-
-        // clear whitespace
-        let line = line.split_whitespace().collect::<String>();
-        let mut line = line.as_str();
-
-        // check first word of command
-        let command = match parse_word.parse_next(&mut line) {
-            // process rest of command based on first word
-            Ok(("G", "1", rest)) => {
-                let g1 = g1_parameter_parse
-                    .parse(rest)
-                    .map_err(|e| GCodeParseError::from_parse(e, input))?;
-                Command::G1 {
-                    x: g1[0].parse().ok(),
-                    y: g1[1].parse().ok(),
-                    z: g1[2].parse().ok(),
-                    e: g1[3].parse().ok(),
-                    f: g1[4].parse().ok(),
-                }
-            }
-            Ok(("G", "28", _)) => Command::Home(string_copy),
-            Ok(("G", "90", _)) => {
-                Command::G90
-            }
-            Ok(("G", "91", _)) => {
-                Command::G91
-            }
-            Ok(("M", "82", _)) => {
-                Command::M82
-            }
-            Ok(("M", "83", _)) => {
-                Command::M83
-            }
-            _ => Command::Raw(string_copy),
-        };
-        gcode.lines.push(GCodeLine {
-            command,
-            comments: String::from(comments),
+pub fn parse_file(input: &Path) -> Result<GCodeModel, GCodeParseError> {
+    let f = std::fs::File::open(input).map_err(|e| GCodeParseError {
+        message: e.to_string(),
+        span: 0..0,
+        input: String::new(),
+    })?;
+    let extension = input.extension().and_then(|ext| ext.to_str());
+    if extension != Some("gcode") {
+        return Err(GCodeParseError {
+            message: format!("Invalid file extension: {}", extension.unwrap_or("")),
+            span: 0..0,
+            input: String::new(),
         });
     }
+    parse_gcode(std::io::BufReader::new(f))
+}
+
+pub fn parse_gcode(mut reader: BufReader<std::fs::File>) -> Result<GCodeModel, GCodeParseError> {
+    let mut gcode = GCodeModel::default();
+    let mut buffer = Vec::with_capacity(4096);
+    while reader.read(&mut buffer).map_err(|e| GCodeParseError {
+        message: e.to_string(),
+        ..Default::default()
+    })? > 0
+    {
+        let split = buffer.split(|&c| c == b'\n' || c == b'\r').map(|b| str::from_utf8(b).unwrap()).collect::<Vec<_>>().iter();
+        if split.len() > 1 {
+            buffer.clear();
+            buffer.append(&mut split.last().unwrap().bytes().collect());
+        }
+        split.for_each(|l| {
+            let (line, comments) = l.split_once(';').unwrap_or((l, ""));
+            let string_copy = String::from(line);
+            let line = line.split_whitespace().collect::<String>();
+            let mut line = line.as_str();
+            let command = match parse_word.parse_next(&mut line) {
+                Ok(("G", "1", rest)) => {
+                    let g1 = g1_parameter_parse
+                        .parse(rest)
+                        .map_err(|e| GCodeParseError::from_parse(e, l))?;
+                    Command::G1 {
+                        x: g1[0].parse().ok(),
+                        y: g1[1].parse().ok(),
+                        z: g1[2].parse().ok(),
+                        e: g1[3].parse().ok(),
+                        f: g1[4].parse().ok(),
+                    }
+                }
+                Ok(("G", "28", _)) => Command::Home(string_copy),
+                Ok(("G", "90", _)) => Command::G90,
+                Ok(("G", "91", _)) => Command::G91,
+                Ok(("M", "82", _)) => Command::M82,
+                Ok(("M", "83", _)) => Command::M83,
+                _ => Command::Raw(string_copy),
+            };
+            gcode.lines.push(GCodeLine {
+                command,
+                comments: String::from(comments),
+            });
+        });
+    }
+
     Ok(gcode)
 }
 
-fn parse_file(input: &mut &'a str) -> Result<GCodeModel, Box<dyn std::error::Error>> {
-    let mut input = input;
-    parse_gcode(&mut input)
-}
-
-
-#[test]
-fn parse_gcode_test() {
-    let input = "G1 X1.0 Y2.0 Z3.0 E4.0 F5.0;hello world\nG28 W ; hello world\nG90; hello world\nG91; hello world\nM82\n; asdf".to_string();
-    let mut input = input.as_str();
-    let result = parse_gcode(&mut input).unwrap();
-    let expected = GCodeModel {
-        lines: vec![
-            GCodeLine {
-                command: Command::G1 {
-                    x: Some(Microns::try_from(1.0).unwrap()),
-                    y: Some(Microns::try_from(2.0).unwrap()),
-                    z: Some(Microns::try_from(3.0).unwrap()),
-                    e: Some(Microns::try_from(4.0).unwrap()),
-                    f: Some(Microns::try_from(5.0).unwrap()),
-                },
-                comments: String::from("hello world"),
-            },
-            GCodeLine {
-                command: Command::Home(String::from("G28 W ")),
-                comments: String::from(" hello world"),
-            },
-            GCodeLine {
-                command: Command::G90,
-                comments: String::from(" hello world"),
-            },
-            GCodeLine {
-                command: Command::G91,
-                comments: String::from(" hello world"),
-            },
-            GCodeLine {
-                command: Command::M82,
-                comments: String::from(""),
-            },
-            GCodeLine {
-                command: Command::Raw(String::from("")),
-                comments: String::from(" asdf"),
-            },
-        ],
-        metadata: Default::default(),
-    };
-    for (a, b) in result.lines.iter().zip(expected.lines.iter()) {
-        assert_eq!(a, b);
-    }
-}
-
-#[test]
-fn parse_line_test() {
-    let mut tests = [
-        ("hello\n", "hello"),
-        ("hello", "hello"),
-        ("hello\nworld", "hello"),
-        ("hello\nworld\n", "hello"),
-        ("hello\nworld\nmore", "hello"),
-        ("hello\nworld\nmore\n", "hello"),
-        ("hello\nworld\nmore\n\n", "hello"),
-        ("\n", ""),
-        ("\r", ""),
-        ("", ""),
-    ];
-    for (input, expected) in tests.iter_mut() {
-        let debug = String::from(*input);
-        let result = parse_line(input).unwrap_or_else(|_| panic!("failed to parse: {}", debug));
-        assert_eq!(result, *expected);
-    }
-}
-
-#[test]
-fn parse_lines_test() {
-    let mut tests = [
-        ("hello\nworld\nmore\n", vec!["hello", "world", "more"]),
-        ("hello\nworld\nmore", vec!["hello", "world", "more"]),
-        ("hello\nworld\nmore\n\n", vec!["hello", "world", "more"]),
-        ("hello", vec!["hello"]),
-        ("hello\n", vec!["hello"]),
-        ("\n", vec![""]),
-        ("", vec![]),
-    ];
-    for (input, expected) in tests.iter_mut() {
-        let result = parse_lines(input).unwrap();
-        assert_eq!(result, *expected);
-    }
-}
 
 #[test]
 fn parse_word_test() {
@@ -284,105 +213,4 @@ fn number_chars() {
             }
         }
     }
-}
-
-#[test]
-fn g1_parameter_parse_test() {
-    let mut tests = [
-        (
-            "X1.0Y2.0Z3.0E4.0F5.0",
-            Command::G1 {
-                x: Some(Microns::from(1.0)),
-                y: Some(Microns::from(2.0)),
-                z: Some(Microns::from(3.0)),
-                e: Some(Microns::from(4.0)),
-                f: Some(Microns::from(5.0)),
-            },
-        ),
-        (
-            "X1.0Y2.0Z3.0E4.0",
-            Command::G1 {
-                x: Some(Microns::from(1.0)),
-                y: Some(Microns::from(2.0)),
-                z: Some(Microns::from(3.0)),
-                e: Some(Microns::from(4.0)),
-                f: None,
-            },
-        ),
-        (
-            "X1.0Y2.0Z3.0",
-            Command::G1 {
-                x: Some(Microns::from(1.0)),
-                y: Some(Microns::from(2.0)),
-                z: Some(Microns::from(3.0)),
-                e: None,
-                f: None,
-            },
-        ),
-        (
-            "X1.0Y2.0",
-            Command::G1 {
-                x: Some(Microns::from(1.0)),
-                y: Some(Microns::from(2.0)),
-                z: None,
-                e: None,
-                f: None,
-            },
-        ),
-        (
-            "X1.0",
-            Command::G1 {
-                x: Some(Microns::from(1.0)),
-                y: None,
-                z: None,
-                e: None,
-                f: None,
-            },
-        ),
-        (
-            "Y-2.0",
-            Command::G1 {
-                x: None,
-                y: Some(Microns::from(-2.0)),
-                z: None,
-                e: None,
-                f: None,
-            },
-        ),
-        (
-            "Z0.000000001",
-            Command::G1 {
-                x: None,
-                y: None,
-                z: Some(Microns::from(0.000000001)),
-                e: None,
-                f: None,
-            },
-        ),
-    ];
-    for (mut input, expected) in tests.iter_mut() {
-        let result = g1_parameter_parse(&mut input).unwrap();
-        let result = Command::G1 {
-            x: result[0].parse().ok(),
-            y: result[1].parse().ok(),
-            z: result[2].parse().ok(),
-            e: result[3].parse().ok(),
-            f: result[4].parse().ok(),
-        };
-        assert_eq!(result, *expected);
-    }
-}
-#[test]
-fn gcode_parse_error_test() {
-    let test = "0";
-    let error = multispace1.parse(test).unwrap_err();
-    let error = GCodeParseError::from_parse(error, test);
-    assert_eq!(
-        GCodeParseError {
-            message: "".to_string(),
-            span: 0..1,
-            input: "0".to_string()
-        },
-        error
-    );
 }

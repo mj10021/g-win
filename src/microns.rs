@@ -52,7 +52,6 @@ impl std::ops::Add for Microns {
     }
 }
 
-
 pub trait Vec5 {
     fn x(&self) -> Microns;
     fn y(&self) -> Microns;
@@ -78,4 +77,3 @@ impl Vec5 for [Microns; 5] {
         self[4]
     }
 }
-
