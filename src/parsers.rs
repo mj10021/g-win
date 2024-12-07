@@ -148,39 +148,50 @@ pub fn parse_gcode(mut reader: BufReader<std::fs::File>) -> Result<GCodeModel, G
     })? > 0
     {
         let mut lines = buffer.drain(..).collect::<Vec<_>>();
-        let mut trail = lines.split_off(lines.iter().rposition(|byte| *byte == b'\n').unwrap());
+        let mut trail = lines.split_off(
+            lines
+                .iter()
+                .rposition(|byte| *byte == b'\n')
+                .unwrap_or(lines.len()),
+        );
         if trail.len() > 0 {
             buffer.clear();
             buffer.append(&mut trail);
         }
         lines.split(|byte| *byte == b'\n').for_each(|l| {
-            let l = str::from_utf8(l).unwrap();
-            let (line, comments) = l.split_once(';').unwrap_or((l, ""));
-            let string_copy = String::from(line);
-            let line = line.split_whitespace().collect::<String>();
-            let mut line = line.as_str();
-            let command = match parse_word.parse_next(&mut line) {
-                Ok(("G", "1", mut rest)) => {
-                    let g1 = g1_parameter_parse.parse_next(&mut rest).unwrap();
-                    Command::G1 {
-                        x: g1[0].parse().ok(),
-                        y: g1[1].parse().ok(),
-                        z: g1[2].parse().ok(),
-                        e: g1[3].parse().ok(),
-                        f: g1[4].parse().ok(),
+            if let Ok(l) = str::from_utf8(l) {
+                let (line, comments) = l.split_once(';').unwrap_or((l, ""));
+                let string_copy = String::from(line);
+                let line = line.split_whitespace().collect::<String>();
+                let mut line = line.as_str();
+                let command = match parse_word.parse_next(&mut line) {
+                    Ok(("G", "1", mut rest)) => {
+                        let g1 = g1_parameter_parse.parse_next(&mut rest).unwrap();
+                        Command::G1 {
+                            x: g1[0].parse().ok(),
+                            y: g1[1].parse().ok(),
+                            z: g1[2].parse().ok(),
+                            e: g1[3].parse().ok(),
+                            f: g1[4].parse().ok(),
+                        }
                     }
-                }
-                Ok(("G", "28", _)) => Command::Home(string_copy),
-                Ok(("G", "90", _)) => Command::G90,
-                Ok(("G", "91", _)) => Command::G91,
-                Ok(("M", "82", _)) => Command::M82,
-                Ok(("M", "83", _)) => Command::M83,
-                _ => Command::Raw(string_copy),
-            };
-            gcode.lines.push(GCodeLine {
-                command,
-                comments: String::from(comments),
-            });
+                    Ok(("G", "28", _)) => Command::Home(string_copy),
+                    Ok(("G", "90", _)) => Command::G90,
+                    Ok(("G", "91", _)) => Command::G91,
+                    Ok(("M", "82", _)) => Command::M82,
+                    Ok(("M", "83", _)) => Command::M83,
+                    _ => Command::Raw(string_copy),
+                };
+                gcode.lines.push(GCodeLine {
+                    command,
+                    comments: String::from(comments),
+                });
+            } else {
+                gcode.lines.push(GCodeLine {
+                    command: Command::Raw(String::from_utf8_lossy(l).to_string()),
+                    comments: String::new(),
+                });
+            }
         });
     }
 
