@@ -147,21 +147,21 @@ pub fn parse_gcode(mut reader: BufReader<std::fs::File>) -> Result<GCodeModel, G
         ..Default::default()
     })? > 0
     {
-        let split = buffer.split(|&c| c == b'\n' || c == b'\r').map(|b| str::from_utf8(b).unwrap()).collect::<Vec<_>>().iter();
-        if split.len() > 1 {
+        let mut lines = buffer.drain(..).collect::<Vec<_>>();
+        let mut trail = lines.split_off(lines.iter().rposition(|byte| *byte == b'\n').unwrap());
+        if trail.len() > 0 {
             buffer.clear();
-            buffer.append(&mut split.last().unwrap().bytes().collect());
+            buffer.append(&mut trail);
         }
-        split.for_each(|l| {
+        lines.split(|byte| *byte == b'\n').for_each(|l| {
+            let l = str::from_utf8(l).unwrap();
             let (line, comments) = l.split_once(';').unwrap_or((l, ""));
             let string_copy = String::from(line);
             let line = line.split_whitespace().collect::<String>();
             let mut line = line.as_str();
             let command = match parse_word.parse_next(&mut line) {
-                Ok(("G", "1", rest)) => {
-                    let g1 = g1_parameter_parse
-                        .parse(rest)
-                        .map_err(|e| GCodeParseError::from_parse(e, l))?;
+                Ok(("G", "1", mut rest)) => {
+                    let g1 = g1_parameter_parse.parse_next(&mut rest).unwrap();
                     Command::G1 {
                         x: g1[0].parse().ok(),
                         y: g1[1].parse().ok(),
@@ -186,7 +186,6 @@ pub fn parse_gcode(mut reader: BufReader<std::fs::File>) -> Result<GCodeModel, G
 
     Ok(gcode)
 }
-
 
 #[test]
 fn parse_word_test() {
