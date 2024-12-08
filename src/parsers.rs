@@ -147,15 +147,14 @@ pub fn parse_gcode(mut reader: BufReader<std::fs::File>) -> Result<GCodeModel, G
         ..Default::default()
     })? > 0
     {
-        let mut lines = buffer.drain(..).collect::<Vec<_>>();
+        let mut lines = buffer.drain(..).collect::<Vec<u8>>();
         let mut trail = lines.split_off(
             lines
                 .iter()
                 .rposition(|byte| *byte == b'\n')
-                .unwrap_or(lines.len()),
+                .unwrap_or(buffer.len()),
         );
         if trail.len() > 0 {
-            buffer.clear();
             buffer.append(&mut trail);
         }
         lines.split(|byte| *byte == b'\n').for_each(|l| {
