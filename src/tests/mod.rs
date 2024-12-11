@@ -25,7 +25,7 @@ fn test_gcode(input: &str) -> PathBuf {
 
 #[test]
 fn parse_gcode() {
-    let test = "
+    let test = BufReader::new("
     G28
     G666; FAKE COMMAND
     FAKE_MACRO FAKE_PARAM 299.00
@@ -38,8 +38,7 @@ fn parse_gcode() {
     G1 X50 Y50
     G1 E1.23
     G1 Y100 E10
-    ";
-    let test = test_gcode(test);
+    ".as_bytes());
     let gcode = GCodeModel::try_from(test).unwrap();
     panic!("{:#?}", gcode);
 }

@@ -3,7 +3,7 @@
 
 pub mod analyzer;
 mod display;
-pub mod microns;
+pub mod state;
 mod parsers;
 mod tests;
 
@@ -11,9 +11,9 @@ use parsers::parse_file;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use std::path::{Path, PathBuf};
+use std::{io::BufReader, path::{Path, PathBuf}};
 
-pub use microns::Microns;
+use microns::*;
 
 /// Represent all possible gcode commands that we would
 /// like to handle, leaving any unknown commands as raw strings.
@@ -97,9 +97,9 @@ impl GCodeModel {
     }
 }
 
-impl TryFrom<PathBuf> for GCodeModel {
+impl TryFrom<BufReader<&[u8]>> for GCodeModel {
     type Error = Box<dyn std::error::Error>;
-    fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
-        parse_file(&path).map_err(|e| e.into())
+    fn try_from(reader: BufReader<&[u8]>) -> Result<Self, Self::Error> {
+        crate::parsers::parse_gcode(&reader).map_err(|e| e.into())
     }
 }

@@ -1,3 +1,97 @@
+use std::fs::File;
+use std::io::{BufReader, Read};
+use std::path::PathBuf;
+use crate::{GCodeModel, GCodeLine, Command, PrintMetadata};
+
+fn parse_gcode(input: PathBuf) -> Result<GCodeModel, Box<dyn std::error::Error>> {
+    let mut out = GCodeModel::default();
+    let file = File::open(input)?;
+    let mut reader = BufReader::new(file);
+    let mut buf = Vec::with_capacity(4096);
+    // keep reading until the file and the buffer are empty
+    while reader.read(&mut buf)? > 0 || buf.len() > 0 {
+        out.lines.push(next_line(buf.as_mut_slice()));
+    }
+    out.metadata = PrintMetadata::from(&out);
+    Ok(out)
+}
+fn next_line(mut input: &mut [u8]) -> GCodeLine {
+    let mut line = String::new();
+    while let Some((first, rest)) = input.split_first_mut() {
+        if *first == b'\n' {
+            break;
+        }
+        line.push(*first as char);
+        input = rest;
+    }
+    GCodeLine {
+        command: Command::Raw(String::new()),//parse_command(&line),
+        comments: String::new(),
+    }
+}
+fn clear_whitespace(mut input: &mut [u8]) {
+    while let Some((first, rest)) = input.split_first_mut() {
+        if (*first).is_ascii_whitespace() {
+            input = rest;
+        } else {
+            break;
+        }
+    }
+}
+fn parse_command() {}
+
+// after the first word is parsed, parse the rest of the line
+// assuming it is a set of key value pairs, and handling the line differently
+// if not
+fn parse_params(input: &mut [u8]) {}
+
+fn is_number_char(c: char) -> bool {
+    c.is_numeric() || c == '.' || c == '-' || c == '+'
+}
+
+fn next_word(mut input: &mut [u8]) -> Result<(char, String), &'static str> {
+    if input.is_empty() {
+        return Err("empty input");
+    }
+    let first = input[0];
+    if !first.is_ascii_alphabetic() {
+        return Err("first char is not alphabetic");
+    }
+    input = &mut input[1..];
+    let mut out = String::new();
+    while let Some((first, rest)) = input.split_first_mut() {
+        if !(*first as char).is_numeric() {
+            break;
+        }
+        out.push(*first as char);
+        input = rest;
+    }
+    Ok((first as char, out))
+}
+
+
+/*
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 use core::str;
 use std::{
     default,
@@ -22,6 +116,33 @@ fn parse_line_text<'a>(input: &mut &'a str) -> PResult<&'a str> {
 
 fn parse_line<'a>(input: &mut &'a str) -> PResult<(&'a str, &'a str)> {
     (parse_line_text, multispace1).parse_next(input)
+}
+// move the input until newline is reached and return the preceding chars
+fn next_line<'a>(input: &mut &'a [u8]) -> Result<&'a [u8]> {
+    while let Some(next) = input.first() {
+
+    }
+    let out = 
+    let ret = {
+        if let Some(next) = input.split(|&byte| byte == b'\n').next() {
+            input 
+            next
+        } else {
+            input
+        }
+    };
+    trim_leading_space(input);
+    Ok(ret)
+}
+
+fn trim_leading_space<'a>(input: &mut &'a [u8]) {
+    while let Some((first, rest)) = input.split_first() {
+        if first.is_ascii_whitespace() {
+            *input = rest;
+        } else {
+            break;
+        }
+    }
 }
 
 /// repeat the parse_line fn until the input is empty and collect to Vec
@@ -223,3 +344,4 @@ fn number_chars() {
         }
     }
 }
+    */

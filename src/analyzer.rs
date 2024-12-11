@@ -1,7 +1,7 @@
 use std::ops::RangeInclusive;
 
-use crate::microns::*;
 use crate::*;
+use state::Vec5;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum CursorError {
