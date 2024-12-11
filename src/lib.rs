@@ -3,15 +3,17 @@
 
 pub mod analyzer;
 mod display;
-pub mod state;
 mod parsers;
+pub mod state;
 mod tests;
 
-use parsers::parse_file;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use std::{io::BufReader, path::{Path, PathBuf}};
+use std::{
+    io::BufReader,
+    path::{Path, PathBuf},
+};
 
 use microns::*;
 
@@ -94,12 +96,5 @@ pub struct GCodeModel {
 impl GCodeModel {
     pub fn get(&self, idx: usize) -> Option<&GCodeLine> {
         self.lines.get(idx)
-    }
-}
-
-impl TryFrom<BufReader<&[u8]>> for GCodeModel {
-    type Error = Box<dyn std::error::Error>;
-    fn try_from(reader: BufReader<&[u8]>) -> Result<Self, Self::Error> {
-        crate::parsers::parse_gcode(&reader).map_err(|e| e.into())
     }
 }
