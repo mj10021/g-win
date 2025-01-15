@@ -36,7 +36,7 @@ impl Emit for G1 {
         let params = vec![('X', x), ('Y', y), ('Z', z), ('E', e), ('F', f)];
         for (letter, param) in params {
             if let Some(param) = param {
-                out += format!("{}{} ", letter, param).as_str();
+                out += format!("{}{} ", letter, f32::from(*param)).as_str();
             }
         }
         out

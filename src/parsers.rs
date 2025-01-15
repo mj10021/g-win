@@ -1,4 +1,5 @@
 use crate::{Command, GCodeLine, GCodeModel, G1};
+use microns::Microns;
 use winnow::{
     ascii::multispace1,
     combinator::{rest, separated_pair},
@@ -50,17 +51,20 @@ fn g1_parameter_parse(input: &mut &str) -> PResult<G1> {
     while let Ok((c, val)) = separated_pair(
         one_of::<_, _, InputError<_>>(['X', 'Y', 'Z', 'E', 'F']),
         winnow::combinator::empty,
-        take_while(1.., is_number_char).parse_to(),
+        take_while(1.., is_number_char).parse_to::<String>(),
     )
     .parse_next(input)
     {
-        match c {
-            'X' => out.x = Some(val),
-            'Y' => out.y = Some(val),
-            'Z' => out.z = Some(val),
-            'E' => out.e = Some(val),
-            'F' => out.f = Some(val),
-            _ => {}
+        if let Ok(val) = val.parse::<f32>() {
+            let val = Microns::from(val);
+            match c {
+                'X' => out.x = Some(val),
+                'Y' => out.y = Some(val),
+                'Z' => out.z = Some(val),
+                'E' => out.e = Some(val),
+                'F' => out.f = Some(val),
+                _ => {}
+            }
         }
     }
     Ok(out)
@@ -187,11 +191,11 @@ fn gcode_parser_test() {
             GCodeLine {
                 id: crate::Id(0),
                 command: Command::G1(G1 {
-                    x: Some(String::from("1.0")),
-                    y: Some(String::from("2.0")),
-                    z: Some(String::from("3.0")),
-                    e: Some(String::from("4.0")),
-                    f: Some(String::from("5.0")),
+                    x: Some(Microns::from(1.0)),
+                    y: Some(Microns::from(2.0)),
+                    z: Some(Microns::from(3.0)),
+                    e: Some(Microns::from(4.0)),
+                    f: Some(Microns::from(5.0)),
                 }),
                 comments: String::from("hello world"),
             },
@@ -297,29 +301,29 @@ fn g1_parameter_parse_test() {
         (
             "X1.0Y2.0Z3.0E4.0F5.0",
             G1 {
-                x: Some(String::from("1.0")),
-                y: Some(String::from("2.0")),
-                z: Some(String::from("3.0")),
-                e: Some(String::from("4.0")),
-                f: Some(String::from("5.0")),
+                x: Some(Microns::from(1.0)),
+                y: Some(Microns::from(2.0)),
+                z: Some(Microns::from(3.0)),
+                e: Some(Microns::from(4.0)),
+                f: Some(Microns::from(5.0)),
             },
         ),
         (
             "X1.0Y2.0Z3.0E4.0",
             G1 {
-                x: Some(String::from("1.0")),
-                y: Some(String::from("2.0")),
-                z: Some(String::from("3.0")),
-                e: Some(String::from("4.0")),
+                x: Some(Microns::from(1.0)),
+                y: Some(Microns::from(2.0)),
+                z: Some(Microns::from(3.0)),
+                e: Some(Microns::from(4.0)),
                 f: None,
             },
         ),
         (
             "X1.0Y2.0Z3.0",
             G1 {
-                x: Some(String::from("1.0")),
-                y: Some(String::from("2.0")),
-                z: Some(String::from("3.0")),
+                x: Some(Microns::from(1.0)),
+                y: Some(Microns::from(2.0)),
+                z: Some(Microns::from(3.0)),
                 e: None,
                 f: None,
             },
@@ -327,8 +331,8 @@ fn g1_parameter_parse_test() {
         (
             "X1.0Y2.0",
             G1 {
-                x: Some(String::from("1.0")),
-                y: Some(String::from("2.0")),
+                x: Some(Microns::from(1.0)),
+                y: Some(Microns::from(2.0)),
                 z: None,
                 e: None,
                 f: None,
@@ -337,7 +341,7 @@ fn g1_parameter_parse_test() {
         (
             "X1.0",
             G1 {
-                x: Some(String::from("1.0")),
+                x: Some(Microns::from(1.0)),
                 y: None,
                 z: None,
                 e: None,
@@ -348,7 +352,7 @@ fn g1_parameter_parse_test() {
             "Y-2.0",
             G1 {
                 x: None,
-                y: Some(String::from("-2.0")),
+                y: Some(Microns::from(-2.0)),
                 z: None,
                 e: None,
                 f: None,
@@ -359,7 +363,7 @@ fn g1_parameter_parse_test() {
             G1 {
                 x: None,
                 y: None,
-                z: Some(String::from("0.000000001")),
+                z: Some(Microns::from(0.000000001)),
                 e: None,
                 f: None,
             },

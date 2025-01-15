@@ -9,17 +9,19 @@ mod tests;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+use microns::Microns;
+
 use std::{io::Write, path::Path};
 
 /// Struct to store G1 params as optional strings
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct G1 {
-    pub x: Option<String>,
-    pub y: Option<String>,
-    pub z: Option<String>,
-    pub e: Option<String>,
-    pub f: Option<String>,
+    pub x: Option<Microns>,
+    pub y: Option<Microns>,
+    pub z: Option<Microns>,
+    pub e: Option<Microns>,
+    pub f: Option<Microns>,
 }
 
 /// Enum to represent all possible gcode commands that we would
