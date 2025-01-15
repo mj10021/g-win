@@ -180,6 +180,7 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
 
 #[test]
 fn gcode_parser_test() {
+    use crate::Tag;
     let input = "G1 X1.0 Y2.0 Z3.0 E4.0 F5.0;hello world\nG28 W ; hello world\nG90; hello world\nG91; hello world\nM82\n; asdf".to_string();
     let mut input = input.as_str();
     let result = gcode_parser(&mut input).unwrap();
@@ -196,6 +197,7 @@ fn gcode_parser_test() {
                     z: Some(Microns::from(3.0)),
                     e: Some(Microns::from(4.0)),
                     f: Some(Microns::from(5.0)),
+                    tag: Tag::Uninitialized
                 }),
                 comments: String::from("hello world"),
             },
@@ -306,6 +308,7 @@ fn g1_parameter_parse_test() {
                 z: Some(Microns::from(3.0)),
                 e: Some(Microns::from(4.0)),
                 f: Some(Microns::from(5.0)),
+                tag: crate::Tag::Uninitialized
             },
         ),
         (
@@ -316,6 +319,7 @@ fn g1_parameter_parse_test() {
                 z: Some(Microns::from(3.0)),
                 e: Some(Microns::from(4.0)),
                 f: None,
+                tag: crate::Tag::Uninitialized
             },
         ),
         (
@@ -326,6 +330,8 @@ fn g1_parameter_parse_test() {
                 z: Some(Microns::from(3.0)),
                 e: None,
                 f: None,
+                tag: crate::Tag::Uninitialized
+
             },
         ),
         (
@@ -336,6 +342,7 @@ fn g1_parameter_parse_test() {
                 z: None,
                 e: None,
                 f: None,
+                tag: crate::Tag::Uninitialized
             },
         ),
         (
@@ -346,6 +353,7 @@ fn g1_parameter_parse_test() {
                 z: None,
                 e: None,
                 f: None,
+                tag: crate::Tag::Uninitialized
             },
         ),
         (
@@ -356,6 +364,7 @@ fn g1_parameter_parse_test() {
                 z: None,
                 e: None,
                 f: None,
+                tag: crate::Tag::Uninitialized
             },
         ),
         (
@@ -366,6 +375,7 @@ fn g1_parameter_parse_test() {
                 z: Some(Microns::from(0.000000001)),
                 e: None,
                 f: None,
+                tag: crate::Tag::Uninitialized
             },
         ),
     ];

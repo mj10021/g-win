@@ -10,8 +10,24 @@ mod tests;
 use serde::{Deserialize, Serialize};
 
 use microns::Microns;
-
 use std::{io::Write, path::Path};
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub enum Tag {
+    Retraction,
+    DeRetraction,
+    Travel,
+    RaiseZ,
+    LowerZ,
+    Wipe,
+    Extrusion,
+    Feedrate,
+    #[default]
+    Uninitialized
+}
+
+
 
 /// Struct to store G1 params as optional strings
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -22,6 +38,7 @@ pub struct G1 {
     pub z: Option<Microns>,
     pub e: Option<Microns>,
     pub f: Option<Microns>,
+    pub tag: Tag
 }
 
 /// Enum to represent all possible gcode commands that we would

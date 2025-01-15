@@ -32,7 +32,7 @@ impl Emit for GCodeLine {
 impl Emit for G1 {
     fn emit(&self, _debug: bool) -> String {
         let mut out = String::from("G1 ");
-        let G1 { x, y, z, e, f } = self;
+        let G1 { x, y, z, e, f, .. } = self;
         let params = vec![('X', x), ('Y', y), ('Z', z), ('E', e), ('F', f)];
         for (letter, param) in params {
             if let Some(param) = param {
