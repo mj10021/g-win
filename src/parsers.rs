@@ -90,7 +90,7 @@ fn is_number_char(byte: u8) -> bool {
 }
 
 fn next_word(mut input: &mut [u8]) -> Result<(char, String), &'static str> {
-    if input.is_empty() {
+    if input.len() < 2 {
         return Err("empty input");
     }
     let first = input[0];
