@@ -197,7 +197,7 @@ fn gcode_parser_test() {
                     z: Some(Microns::from(3.0)),
                     e: Some(Microns::from(4.0)),
                     f: Some(Microns::from(5.0)),
-                    tag: Tag::Uninitialized
+                    tag: Tag::Uninitialized,
                 }),
                 comments: String::from("hello world"),
             },
@@ -308,7 +308,7 @@ fn g1_parameter_parse_test() {
                 z: Some(Microns::from(3.0)),
                 e: Some(Microns::from(4.0)),
                 f: Some(Microns::from(5.0)),
-                tag: crate::Tag::Uninitialized
+                tag: crate::Tag::Uninitialized,
             },
         ),
         (
@@ -319,7 +319,7 @@ fn g1_parameter_parse_test() {
                 z: Some(Microns::from(3.0)),
                 e: Some(Microns::from(4.0)),
                 f: None,
-                tag: crate::Tag::Uninitialized
+                tag: crate::Tag::Uninitialized,
             },
         ),
         (
@@ -330,8 +330,7 @@ fn g1_parameter_parse_test() {
                 z: Some(Microns::from(3.0)),
                 e: None,
                 f: None,
-                tag: crate::Tag::Uninitialized
-
+                tag: crate::Tag::Uninitialized,
             },
         ),
         (
@@ -342,7 +341,7 @@ fn g1_parameter_parse_test() {
                 z: None,
                 e: None,
                 f: None,
-                tag: crate::Tag::Uninitialized
+                tag: crate::Tag::Uninitialized,
             },
         ),
         (
@@ -353,7 +352,7 @@ fn g1_parameter_parse_test() {
                 z: None,
                 e: None,
                 f: None,
-                tag: crate::Tag::Uninitialized
+                tag: crate::Tag::Uninitialized,
             },
         ),
         (
@@ -364,7 +363,7 @@ fn g1_parameter_parse_test() {
                 z: None,
                 e: None,
                 f: None,
-                tag: crate::Tag::Uninitialized
+                tag: crate::Tag::Uninitialized,
             },
         ),
         (
@@ -375,7 +374,7 @@ fn g1_parameter_parse_test() {
                 z: Some(Microns::from(0.000000001)),
                 e: None,
                 f: None,
-                tag: crate::Tag::Uninitialized
+                tag: crate::Tag::Uninitialized,
             },
         ),
     ];

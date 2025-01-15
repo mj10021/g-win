@@ -24,10 +24,8 @@ pub enum Tag {
     Extrusion,
     Feedrate,
     #[default]
-    Uninitialized
+    Uninitialized,
 }
-
-
 
 /// Struct to store G1 params as optional strings
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -38,7 +36,7 @@ pub struct G1 {
     pub z: Option<Microns>,
     pub e: Option<Microns>,
     pub f: Option<Microns>,
-    pub tag: Tag
+    pub tag: Tag,
 }
 
 /// Enum to represent all possible gcode commands that we would
@@ -103,6 +101,51 @@ impl GCodeModel {
         f.write_all(out.as_bytes())?;
         println!("save successful");
         Ok(())
+    }
+    pub fn tag_g1(&mut self) {
+        let mut prev = [
+            Microns::ZERO,
+            Microns::ZERO,
+            Microns::ZERO,
+        ];
+        for line in self.lines.iter_mut() {
+            if let Command::G1(G1 { x, y, z, e, f, tag }) = &mut line.command {
+                let curr = [
+                    prev[0] + x.unwrap_or(Microns::ZERO),
+                    prev[1] + y.unwrap_or(Microns::ZERO),
+                    prev[2] + z.unwrap_or(Microns::ZERO),
+                ];
+
+                let dx = curr[0] - prev[0];
+                let dy = curr[1] - prev[1];
+                let dz = curr[2] - prev[2];
+                let de = e.unwrap_or(Microns::ZERO);
+                let f = f.unwrap_or(Microns::ZERO);
+
+                *tag = {
+                    if de > Microns::ZERO {
+                        if dx.abs() > Microns::ZERO || dy.abs() > Microns::ZERO {
+                            Tag::Extrusion
+                        } else { Tag::DeRetraction }
+                    } else if de == Microns::ZERO {
+                        if dx.abs() > Microns::ZERO || dy.abs() > Microns::ZERO {
+                            Tag::Travel
+                        } else if dz > Microns::ZERO {
+                            Tag::RaiseZ
+                        } else if dz < Microns::ZERO {
+                            Tag::LowerZ
+                        } else if f > Microns::ZERO {
+                            Tag::Feedrate
+                        } else { Tag::Uninitialized }
+                    } else {
+                        if dx.abs() > Microns::ZERO || dy.abs() > Microns::ZERO {
+                            Tag::Wipe
+                        } else { Tag::Retraction }
+                    }
+                };
+                prev = curr;
+            }
+        }
     }
 }
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
