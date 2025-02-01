@@ -13,7 +13,7 @@ use microns::Microns;
 use std::{io::Write, path::Path};
 /// Default basic annotations for G1 moves, generated automatically
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Tag {
     Retraction,
     DeRetraction,
@@ -52,6 +52,15 @@ pub enum Command {
     M82,
     M83,
     Raw(String),
+}
+
+impl Command {
+    pub fn tag(&self) -> Tag {
+        match self {
+            Command::G1(g1) => g1.tag,
+            _ => Tag::Uninitialized,
+        }
+    }
 }
 
 /// Struct to store a single line of gcode, with an id, command,
@@ -147,6 +156,96 @@ impl GCodeModel {
             }
         }
     }
+}
+
+#[test]
+fn tag_test() {
+    let mut gcode = GCodeModel::default();
+    gcode.lines.push(GCodeLine {
+        id: gcode.id_counter.get(),
+        command: Command::G1(G1 {
+            x: Some(Microns::from(10.0)),
+            y: Some(Microns::from(10.0)),
+            z: Some(Microns::from(10.0)),
+            e: Some(Microns::from(10.0)),
+            f: Some(Microns::from(10.0)),
+            tag: Tag::Uninitialized,
+        }),
+        comments: String::new(),
+    });
+    gcode.tag_g1();
+    assert_eq!(gcode.lines[0].command.tag(), Tag::Extrusion);
+    gcode.lines.push(GCodeLine {
+        id: gcode.id_counter.get(),
+        command: Command::G1(G1::default()),
+        comments: String::new(),
+    });
+    gcode.tag_g1();
+    assert_eq!(gcode.lines[1].command.tag(), Tag::Uninitialized);
+    gcode.lines.push(GCodeLine {
+        id: gcode.id_counter.get(),
+        command: Command::G1(G1 {
+            e: Some(Microns::from(-10.0)),
+            ..Default::default()
+        }),
+        comments: String::new(),
+    });
+    gcode.tag_g1();
+    assert_eq!(gcode.lines[2].command.tag(), Tag::Retraction);
+    gcode.lines.push(GCodeLine {
+        id: gcode.id_counter.get(),
+        command: Command::G1(G1 {
+            e: Some(Microns::from(-10.0)),
+            x: Some(Microns::from(10.0)),
+            y: Some(Microns::from(10.0)),
+            ..Default::default()
+        }),
+        comments: String::new(),
+    });
+    gcode.tag_g1();
+    assert_eq!(gcode.lines[3].command.tag(), Tag::Wipe);
+    gcode.lines.push(GCodeLine {
+        id: gcode.id_counter.get(),
+        command: Command::G1(G1 {
+            e: Some(Microns::from(-10.0)),
+            z: Some(Microns::from(10.0)),
+            ..Default::default()
+        }),
+        comments: String::new(),
+    });
+    gcode.tag_g1();
+    assert_eq!(gcode.lines[4].command.tag(), Tag::Retraction);
+    gcode.lines.push(GCodeLine {
+        id: gcode.id_counter.get(),
+        command: Command::G1(G1 {
+            e: Some(Microns::from(-10.0)),
+            z: Some(Microns::from(-10.0)),
+            ..Default::default()
+        }),
+        comments: String::new(),
+    });
+    gcode.tag_g1();
+    assert_eq!(gcode.lines[5].command.tag(), Tag::Retraction);
+    gcode.lines.push(GCodeLine {
+        id: gcode.id_counter.get(),
+        command: Command::G1(G1 {
+            f: Some(Microns::from(10.0)),
+            ..Default::default()
+        }),
+        comments: String::new(),
+    });
+    gcode.tag_g1();
+    assert_eq!(gcode.lines[6].command.tag(), Tag::Feedrate);
+    gcode.lines.push(GCodeLine {
+        id: gcode.id_counter.get(),
+        command: Command::G1(G1 {
+            e: Some(Microns::from(10.0)),
+            ..Default::default()
+        }),
+        comments: String::new(),
+    });
+    gcode.tag_g1();
+    assert_eq!(gcode.lines[7].command.tag(), Tag::DeRetraction);
 }
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
