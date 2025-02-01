@@ -146,10 +146,10 @@ impl GCodeModel {
                         } else if f > Microns::ZERO {
                             Tag::Feedrate
                         } else { Tag::Uninitialized }
-                    } else {
-                        if dx.abs() > Microns::ZERO || dy.abs() > Microns::ZERO {
+                    } else if dx.abs() > Microns::ZERO || dy.abs() > Microns::ZERO {
                             Tag::Wipe
-                        } else { Tag::Retraction }
+                    } else {
+                        Tag::Retraction
                     }
                 };
                 prev = curr;
