@@ -2,22 +2,22 @@ use crate::{Command, GCodeLine, GCodeModel, G1};
 use microns::Microns;
 use winnow::{
     ascii::multispace1,
-    combinator::{rest, separated_pair},
+    combinator::{separated_pair},
     error::InputError,
-    token::{one_of, take, take_till, take_while},
-    PResult, Parser,
+    token::{rest, one_of, take, take_till, take_while},
+    ModalResult, Parser,
 };
 
 /// parse a line until '\n' or '\r' and then clear all following whitespace
-fn parse_line<'a>(input: &mut &'a str) -> PResult<&'a str> {
+fn parse_line<'a>(input: &mut &'a str) -> ModalResult<&'a str> {
     // this must always consume at least one character
     let line = take_till(0.., |c| c == '\n' || c == '\r').parse_next(input)?;
-    let _: PResult<&str> = multispace1.parse_next(input);
+    let _: ModalResult<&str> = multispace1.parse_next(input);
     Ok(line)
 }
 
 /// repeat the parse_line fn until the input is empty and collect to Vec
-fn parse_lines<'a>(input: &mut &'a str) -> PResult<Vec<&'a str>> {
+fn parse_lines<'a>(input: &mut &'a str) -> ModalResult<Vec<&'a str>> {
     let mut out = Vec::new();
     loop {
         if input.is_empty() {
@@ -31,7 +31,7 @@ fn parse_lines<'a>(input: &mut &'a str) -> PResult<Vec<&'a str>> {
 /// parse the first word of a line by taking the first char
 /// and then parsing all following numeric characters, not accepting
 /// floats, negative numbers, or scientific notation
-fn parse_word<'a>(input: &mut &'a str) -> PResult<(&'a str, &'a str, &'a str)> {
+fn parse_word<'a>(input: &mut &'a str) -> ModalResult<(&'a str, &'a str, &'a str)> {
     (
         take(1_usize),
         take_while(0.., |c: char| c.is_numeric()),
@@ -46,7 +46,7 @@ fn is_number_char(c: char) -> bool {
 }
 
 /// parses g1 params once the first word ("G1") has been parsed
-fn g1_parameter_parse(input: &mut &str) -> PResult<G1> {
+fn g1_parameter_parse(input: &mut &str) -> ModalResult<G1> {
     let mut out = G1::default();
     while let Ok((c, val)) = separated_pair(
         one_of::<_, _, InputError<_>>(['X', 'Y', 'Z', 'E', 'F']),
