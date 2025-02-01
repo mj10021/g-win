@@ -2,7 +2,7 @@ use crate::{Command, GCodeLine, GCodeModel, G1};
 use microns::Microns;
 use winnow::{
     ascii::multispace1,
-    combinator::{separated_pair},
+    combinator::separated_pair,
     error::InputError,
     token::{rest, one_of, take, take_till, take_while},
     ModalResult, Parser,
