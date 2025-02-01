@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use microns::Microns;
 use std::{io::Write, path::Path};
-
+/// Default basic annotations for G1 moves, generated automatically
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub enum Tag {
