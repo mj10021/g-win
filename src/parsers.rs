@@ -175,6 +175,7 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
             comments: String::from(comments),
         });
     }
+    gcode.tag_g1();
     Ok(gcode)
 }
 
