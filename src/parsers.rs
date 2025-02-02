@@ -1,10 +1,10 @@
-use crate::{Command, GCodeLine, GCodeModel, G1};
+use crate::{GCodeLine, GCodeModel, Instruction, G1};
 use microns::Microns;
 use winnow::{
     ascii::multispace1,
     combinator::separated_pair,
     error::InputError,
-    token::{rest, one_of, take, take_till, take_while},
+    token::{one_of, rest, take, take_till, take_while},
     ModalResult, Parser,
 };
 
@@ -149,30 +149,31 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
                 let g1 = g1_parameter_parse
                     .parse(rest)
                     .map_err(|e| GCodeParseError::from_parse(e, input))?;
-                Command::G1(g1)
+                Instruction::G1(g1)
             }
             Ok(("G", "90", _)) => {
                 gcode.rel_xyz = false;
-                Command::G90
+                Instruction::G90
             }
             Ok(("G", "91", _)) => {
                 gcode.rel_xyz = true;
-                Command::G91
+                Instruction::G91
             }
             Ok(("M", "82", _)) => {
                 gcode.rel_e = false;
-                Command::M82
+                Instruction::M82
             }
             Ok(("M", "83", _)) => {
                 gcode.rel_e = true;
-                Command::M83
+                Instruction::M83
             }
-            _ => Command::Raw(string_copy),
+            _ => Instruction::Raw(string_copy),
         };
         gcode.lines.push(GCodeLine {
             id,
             command,
             comments: String::from(comments),
+            state: Default::default(),
         });
     }
     gcode.tag_g1();
@@ -192,7 +193,7 @@ fn gcode_parser_test() {
         lines: vec![
             GCodeLine {
                 id: crate::Id(0),
-                command: Command::G1(G1 {
+                command: Instruction::G1(G1 {
                     x: Some(Microns::from(1.0)),
                     y: Some(Microns::from(2.0)),
                     z: Some(Microns::from(3.0)),
@@ -201,31 +202,37 @@ fn gcode_parser_test() {
                     tag: Tag::Uninitialized,
                 }),
                 comments: String::from("hello world"),
+                state: Default::default(),
             },
             GCodeLine {
                 id: crate::Id(1),
-                command: Command::Raw(String::from("G28 W ")),
+                command: Instruction::Raw(String::from("G28 W ")),
                 comments: String::from(" hello world"),
+                state: Default::default(),
             },
             GCodeLine {
                 id: crate::Id(2),
-                command: Command::G90,
+                command: Instruction::G90,
                 comments: String::from(" hello world"),
+                state: Default::default(),
             },
             GCodeLine {
                 id: crate::Id(3),
-                command: Command::G91,
+                command: Instruction::G91,
                 comments: String::from(" hello world"),
+                state: Default::default(),
             },
             GCodeLine {
                 id: crate::Id(4),
-                command: Command::M82,
+                command: Instruction::M82,
                 comments: String::from(""),
+                state: Default::default(),
             },
             GCodeLine {
                 id: crate::Id(5),
-                command: Command::Raw(String::from("")),
+                command: Instruction::Raw(String::from("")),
                 comments: String::from(" asdf"),
+                state: Default::default(),
             },
         ],
     };

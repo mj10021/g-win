@@ -1,19 +1,19 @@
-use crate::{Command, GCodeLine, GCodeModel, G1};
+use crate::{GCodeLine, GCodeModel, Instruction, G1};
 
 /// Trait objects that can be emitted to valid gcode, with an optional debug line appended
 pub trait Emit {
     fn emit(&self, debug: bool) -> String;
 }
 
-impl Emit for Command {
+impl Emit for Instruction {
     fn emit(&self, debug: bool) -> String {
         match self {
-            Command::G1(g1) => g1.emit(debug),
-            Command::G90 => "G90".to_string(),
-            Command::G91 => "G91".to_string(),
-            Command::M82 => "M82".to_string(),
-            Command::M83 => "M83".to_string(),
-            Command::Raw(s) => s.clone(),
+            Instruction::G1(g1) => g1.emit(debug),
+            Instruction::G90 => "G90".to_string(),
+            Instruction::G91 => "G91".to_string(),
+            Instruction::M82 => "M82".to_string(),
+            Instruction::M83 => "M83".to_string(),
+            Instruction::Raw(s) => s.clone(),
         }
     }
 }

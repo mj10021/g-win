@@ -45,7 +45,7 @@ pub struct G1 {
 /// be added as needed.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Command {
+pub enum Instruction {
     G1(G1),
     G90,
     G91,
@@ -54,11 +54,68 @@ pub enum Command {
     Raw(String),
 }
 
-impl Command {
+impl Instruction {
     pub fn tag(&self) -> Tag {
         match self {
-            Command::G1(g1) => g1.tag,
+            Instruction::G1(g1) => g1.tag,
             _ => Tag::Uninitialized,
+        }
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct State {
+    rel_xyz: bool,
+    rel_e: bool,
+    bed_temp: u8,
+    hotend_temp: u8,
+    /// x, y, z, e, f
+    position: [Microns; 5],
+    fan_speed: u8,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        State {
+            rel_xyz: false,
+            rel_e: false,
+            bed_temp: 0,
+            hotend_temp: 0,
+            position: [Microns::ZERO; 5],
+            fan_speed: 0,
+        }
+    }
+}
+
+impl State {
+    fn apply(&mut self, instruction: &Instruction) {
+        match instruction {
+            Instruction::G1(g1) => {
+                let [x, y, z, e, f] =
+                    [g1.x, g1.y, g1.z, g1.e, g1.f].map(|o| o.unwrap_or(Microns::MIN));
+                [
+                    (0, x, self.rel_xyz),
+                    (1, y, self.rel_xyz),
+                    (2, z, self.rel_xyz),
+                    (3, e, self.rel_e),
+                ]
+                .iter()
+                .for_each(|&(i, val, rel)| {
+                    if val != Microns::MIN {
+                        self.position[i] = if rel { self.position[i] + val } else { val };
+                    }
+                });
+
+                if f != Microns::MIN {
+                    self.position[4] = f;
+                }
+            },
+            Instruction::G90 => self.rel_xyz = false,
+            Instruction::G91 => self.rel_xyz = true,
+            Instruction::M82 => self.rel_e = false,
+            Instruction::M83 => self.rel_e = true,
+            Instruction::Raw(_) => (),
         }
     }
 }
@@ -69,7 +126,8 @@ impl Command {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct GCodeLine {
     pub id: Id,
-    pub command: Command,
+    pub state: State,
+    pub command: Instruction,
     pub comments: String,
 }
 
@@ -112,13 +170,9 @@ impl GCodeModel {
         Ok(())
     }
     pub fn tag_g1(&mut self) {
-        let mut prev = [
-            Microns::ZERO,
-            Microns::ZERO,
-            Microns::ZERO,
-        ];
+        let mut prev = [Microns::ZERO, Microns::ZERO, Microns::ZERO];
         for line in self.lines.iter_mut() {
-            if let Command::G1(G1 { x, y, z, e, f, tag }) = &mut line.command {
+            if let Instruction::G1(G1 { x, y, z, e, f, tag }) = &mut line.command {
                 let curr = [
                     prev[0] + x.unwrap_or(Microns::ZERO),
                     prev[1] + y.unwrap_or(Microns::ZERO),
@@ -135,7 +189,9 @@ impl GCodeModel {
                     if de > Microns::ZERO {
                         if dx.abs() > Microns::ZERO || dy.abs() > Microns::ZERO {
                             Tag::Extrusion
-                        } else { Tag::DeRetraction }
+                        } else {
+                            Tag::DeRetraction
+                        }
                     } else if de == Microns::ZERO {
                         if dx.abs() > Microns::ZERO || dy.abs() > Microns::ZERO {
                             Tag::Travel
@@ -145,9 +201,11 @@ impl GCodeModel {
                             Tag::LowerZ
                         } else if f > Microns::ZERO {
                             Tag::Feedrate
-                        } else { Tag::Uninitialized }
+                        } else {
+                            Tag::Uninitialized
+                        }
                     } else if dx.abs() > Microns::ZERO || dy.abs() > Microns::ZERO {
-                            Tag::Wipe
+                        Tag::Wipe
                     } else {
                         Tag::Retraction
                     }
@@ -163,7 +221,7 @@ fn tag_test() {
     let mut gcode = GCodeModel::default();
     gcode.lines.push(GCodeLine {
         id: gcode.id_counter.get(),
-        command: Command::G1(G1 {
+        command: Instruction::G1(G1 {
             x: Some(Microns::from(10.0)),
             y: Some(Microns::from(10.0)),
             z: Some(Microns::from(10.0)),
@@ -172,77 +230,85 @@ fn tag_test() {
             tag: Tag::Uninitialized,
         }),
         comments: String::new(),
+        state: State::default(),
     });
     gcode.tag_g1();
     assert_eq!(gcode.lines[0].command.tag(), Tag::Extrusion);
     gcode.lines.push(GCodeLine {
         id: gcode.id_counter.get(),
-        command: Command::G1(G1::default()),
+        command: Instruction::G1(G1::default()),
         comments: String::new(),
+        state: State::default(),
     });
     gcode.tag_g1();
     assert_eq!(gcode.lines[1].command.tag(), Tag::Uninitialized);
     gcode.lines.push(GCodeLine {
         id: gcode.id_counter.get(),
-        command: Command::G1(G1 {
+        command: Instruction::G1(G1 {
             e: Some(Microns::from(-10.0)),
             ..Default::default()
         }),
         comments: String::new(),
+        state: State::default(),
     });
     gcode.tag_g1();
     assert_eq!(gcode.lines[2].command.tag(), Tag::Retraction);
     gcode.lines.push(GCodeLine {
         id: gcode.id_counter.get(),
-        command: Command::G1(G1 {
+        command: Instruction::G1(G1 {
             e: Some(Microns::from(-10.0)),
             x: Some(Microns::from(10.0)),
             y: Some(Microns::from(10.0)),
             ..Default::default()
         }),
         comments: String::new(),
+        state: State::default(),
     });
     gcode.tag_g1();
     assert_eq!(gcode.lines[3].command.tag(), Tag::Wipe);
     gcode.lines.push(GCodeLine {
         id: gcode.id_counter.get(),
-        command: Command::G1(G1 {
+        command: Instruction::G1(G1 {
             e: Some(Microns::from(-10.0)),
             z: Some(Microns::from(10.0)),
             ..Default::default()
         }),
         comments: String::new(),
+        state: State::default(),
     });
     gcode.tag_g1();
     assert_eq!(gcode.lines[4].command.tag(), Tag::Retraction);
     gcode.lines.push(GCodeLine {
         id: gcode.id_counter.get(),
-        command: Command::G1(G1 {
+        command: Instruction::G1(G1 {
             e: Some(Microns::from(-10.0)),
             z: Some(Microns::from(-10.0)),
             ..Default::default()
         }),
         comments: String::new(),
+        state: State::default(),
     });
     gcode.tag_g1();
     assert_eq!(gcode.lines[5].command.tag(), Tag::Retraction);
     gcode.lines.push(GCodeLine {
         id: gcode.id_counter.get(),
-        command: Command::G1(G1 {
+        command: Instruction::G1(G1 {
             f: Some(Microns::from(10.0)),
             ..Default::default()
         }),
         comments: String::new(),
+        state: State::default(),
     });
     gcode.tag_g1();
     assert_eq!(gcode.lines[6].command.tag(), Tag::Feedrate);
     gcode.lines.push(GCodeLine {
         id: gcode.id_counter.get(),
-        command: Command::G1(G1 {
+        command: Instruction::G1(G1 {
             e: Some(Microns::from(10.0)),
             ..Default::default()
         }),
         comments: String::new(),
+        state: State::default(),
     });
     gcode.tag_g1();
     assert_eq!(gcode.lines[7].command.tag(), Tag::DeRetraction);
