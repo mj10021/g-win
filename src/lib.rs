@@ -214,6 +214,15 @@ impl GCodeModel {
             }
         }
     }
+    fn set_states(&mut self) {
+        let mut prev = None;
+        for line in self.lines.iter_mut() {
+            if prev.is_some() {
+                line.state.apply(&line.command);
+            }
+            prev = Some(line);
+        }
+    }
 }
 
 #[test]

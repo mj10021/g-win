@@ -177,6 +177,7 @@ pub fn gcode_parser(input: &mut &str) -> Result<GCodeModel, GCodeParseError> {
         });
     }
     gcode.tag_g1();
+    gcode.set_states();
     Ok(gcode)
 }
 
